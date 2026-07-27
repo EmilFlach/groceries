@@ -1,0 +1,12 @@
+product: jvm/app
+
+dependencies:
+  - //shared
+  - $compose.desktop.currentOs
+  - $libs.logback.classic
+  - ../shared
+
+settings:
+  compose: enabled
+  jvm:
+    mainClass: com.emilflach.groceries.MainKt

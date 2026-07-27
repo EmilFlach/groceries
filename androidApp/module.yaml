@@ -1,0 +1,12 @@
+product: android/app
+
+dependencies:
+  - //shared
+  - $libs.androidx.activity.compose
+  - ../shared
+
+settings:
+  compose: enabled
+  android:
+    namespace: com.emilflach.groceries
+    applicationId: com.emilflach.groceries

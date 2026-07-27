@@ -1,0 +1,9 @@
+product: wasm-js/app
+
+dependencies:
+  - //shared
+  - $compose.ui
+  - ../shared
+
+settings:
+  compose: enabled

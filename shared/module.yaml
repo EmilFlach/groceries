@@ -1,0 +1,20 @@
+product:
+  type: kmp/lib
+  platforms: [ jvm, android, iosArm64, iosX64, iosSimulatorArm64, wasmJs ]
+
+dependencies:
+  - $compose.foundation
+  - $compose.material3
+  - $compose.preview
+  - $compose.hotReload.runtimeApi
+
+dependencies@android:
+  - $compose.uiTooling
+
+settings:
+  compose:
+    enabled: true
+    resources:
+      packageName: com.emilflach.groceries.resources
+      # Generate public accessors so other modules (and previews) can use Res.*
+      exposedAccessors: true
