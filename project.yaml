@@ -2,5 +2,9 @@ modules:
   - //androidApp
   - //desktopApp
   - //iosApp
+  - //plugins/sqldelight
   - //shared
   - //webApp
+
+plugins:
+  - ./plugins/sqldelight

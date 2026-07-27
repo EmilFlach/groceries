@@ -10,3 +10,6 @@ settings:
   android:
     namespace: com.emilflach.groceries
     applicationId: com.emilflach.groceries
+    compileSdk: 36
+    minSdk: 26
+    targetSdk: 35

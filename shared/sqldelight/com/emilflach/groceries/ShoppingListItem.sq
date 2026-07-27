@@ -1,0 +1,30 @@
+CREATE TABLE ShoppingListItem (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lokcal_food_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    image_url TEXT,
+    added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    checked_at TEXT
+);
+
+-- Prevents re-adding a food that's already active (unchecked) on the list.
+CREATE UNIQUE INDEX IF NOT EXISTS shopping_list_item_active_food_idx
+    ON ShoppingListItem(lokcal_food_id) WHERE checked_at IS NULL;
+
+selectAll:
+SELECT * FROM ShoppingListItem ORDER BY checked_at IS NOT NULL, added_at DESC;
+
+selectActiveByFoodId:
+SELECT * FROM ShoppingListItem WHERE lokcal_food_id = ? AND checked_at IS NULL;
+
+insertItem:
+INSERT INTO ShoppingListItem(lokcal_food_id, name, image_url) VALUES (?, ?, ?);
+
+selectLastInsertRowId:
+SELECT last_insert_rowid();
+
+setChecked:
+UPDATE ShoppingListItem SET checked_at = ? WHERE id = ?;
+
+deleteById:
+DELETE FROM ShoppingListItem WHERE id = ?;

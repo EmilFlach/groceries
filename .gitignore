@@ -10,3 +10,5 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 xcuserdata
 .idea/
+groceries.db
+lokcal_snapshot.db

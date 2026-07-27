@@ -1,6 +1,0 @@
-<resources>
-    <string name="app_title">Kotlin Multiplatform Example</string>
-    <string name="running_on">Running on %1$s</string>
-    <string name="show_greeting">Show greeting</string>
-    <string name="greeting_message">Hello from Compose Multiplatform!</string>
-</resources>

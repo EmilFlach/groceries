@@ -1,0 +1,13 @@
+tasks:
+  generate:
+    action: !sqldelight.amper.generateSqlDelight
+      sqlSourceDir: ${module.rootDir}/sqldelight
+      generatedSourceDir: ${taskOutputDir}
+      packageName: ${pluginSettings.packageName}
+      databaseName: ${pluginSettings.databaseName}
+      generateAsync: ${pluginSettings.generateAsync}
+
+generated:
+  sources:
+    - language: kotlin
+      directory: ${tasks.generate.action.generatedSourceDir}

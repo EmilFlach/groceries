@@ -1,0 +1,14 @@
+product: jvm/amper-plugin
+
+description: Generates SQLDelight database code from .sq files into generated.sources. Replaces the app.cash.sqldelight Gradle plugin. Vendored from amper-playground/sqldelight-plugin and extended with generateAsync.
+
+dependencies:
+  - app.cash.sqldelight:gradle-plugin:2.2.1
+  - app.cash.sqldelight:sqlite-3-18-dialect:2.2.1
+  - app.cash.sql-psi:environment:0.7.2
+  - app.cash.sql-psi:core:0.7.2
+  - app.cash.sqldelight:compiler-env:2.2.1
+
+pluginInfo:
+  id: sqldelight
+  settingsClass: sqldelight.amper.SqlDelightSettings

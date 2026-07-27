@@ -4,6 +4,8 @@ dependencies:
   - //shared
   - $compose.desktop.currentOs
   - $libs.logback.classic
+  - $libs.filekit.core
+  - $libs.kotlinx.coroutines.swing
   - ../shared
 
 settings:

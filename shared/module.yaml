@@ -1,15 +1,35 @@
 product:
   type: kmp/lib
-  platforms: [ jvm, android, iosArm64, iosX64, iosSimulatorArm64, wasmJs ]
+  platforms: [ jvm, android, iosArm64, iosSimulatorArm64, wasmJs ]
 
 dependencies:
   - $compose.foundation
-  - $compose.material3
+  - org.jetbrains.compose.material3:material3:1.10.0-alpha05
   - $compose.preview
   - $compose.hotReload.runtimeApi
+  - $libs.kotlinx.coroutines.core
+  - $libs.sqlDelight.primitive.adapters
+  - $libs.sqlDelight.async.extensions
+  - $libs.filekit.core
+  - $libs.filekit.dialogs
+  - $libs.filekit.dialogs.compose
+  - $libs.compose.material.icons.extended
 
 dependencies@android:
   - $compose.uiTooling
+  - $libs.kotlinx.coroutines.android
+  - $libs.sqlDelight.driver.android
+  - $libs.androidx.documentfile
+
+dependencies@jvm:
+  - $libs.sqlDelight.driver.sqlite
+  - $libs.sqlite.jdbc
+
+dependencies@native:
+  - $libs.sqlDelight.driver.native
+
+dependencies@wasmJs:
+  - $libs.sqlDelight.driver.js
 
 settings:
   compose:
@@ -18,3 +38,20 @@ settings:
       packageName: com.emilflach.groceries.resources
       # Generate public accessors so other modules (and previews) can use Res.*
       exposedAccessors: true
+    version: 1.11.1
+  kotlin:
+    freeCompilerArgs: [-Xexpect-actual-classes]
+
+settings@ios:
+  kotlin:
+    linkerOptions: [-lsqlite3]
+
+test-dependencies:
+  - $libs.kotlinx.coroutines.test
+
+plugins:
+  sqldelight:
+    enabled: true
+    packageName: com.emilflach.groceries
+    databaseName: Database
+    generateAsync: true
