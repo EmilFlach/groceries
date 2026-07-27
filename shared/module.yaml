@@ -4,7 +4,7 @@ product:
 
 dependencies:
   - $compose.foundation
-  - org.jetbrains.compose.material3:material3:1.10.0-alpha05
+  - $libs.compose.material3
   - $compose.preview
   - $compose.hotReload.runtimeApi
   - $libs.kotlinx.coroutines.core

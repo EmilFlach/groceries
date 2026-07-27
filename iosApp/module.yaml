@@ -1,9 +1,12 @@
-product: ios/app
+product:
+  type: ios/app
+  platforms: [ iosArm64, iosSimulatorArm64 ]
 
 dependencies:
-  - //shared
-  - $compose.ui
   - ../shared
+  - $compose.ui
 
 settings:
-  compose: enabled
+  compose:
+    enabled: true
+    version: 1.11.1

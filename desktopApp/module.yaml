@@ -1,14 +1,15 @@
 product: jvm/app
 
 dependencies:
-  - //shared
+  - ../shared
   - $compose.desktop.currentOs
   - $libs.logback.classic
   - $libs.filekit.core
   - $libs.kotlinx.coroutines.swing
-  - ../shared
 
 settings:
-  compose: enabled
+  compose:
+    enabled: true
+    version: 1.11.1
   jvm:
     mainClass: com.emilflach.groceries.MainKt

@@ -1,12 +1,13 @@
 product: android/app
 
 dependencies:
-  - //shared
-  - $libs.androidx.activity.compose
   - ../shared
+  - $libs.androidx.activity.compose
 
 settings:
-  compose: enabled
+  compose:
+    enabled: true
+    version: 1.11.1
   android:
     namespace: com.emilflach.groceries
     applicationId: com.emilflach.groceries

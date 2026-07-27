@@ -1,9 +1,11 @@
 product: wasm-js/app
 
 dependencies:
-  - //shared
-  - $compose.ui
   - ../shared
+  - $compose.ui
 
 settings:
-  compose: enabled
+  compose:
+    enabled: true
+    version: 1.11.1
+

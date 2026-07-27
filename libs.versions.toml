@@ -13,6 +13,10 @@ kotlinx-coroutines = "1.11.0"
 # Compose Multiplatform stopped publishing material-icons-extended after 1.7.3;
 # the CMP compose.materialIconsExtended accessor pinned this version implicitly.
 composeMaterialIconsExtended = "1.7.3"
+# Material3 is versioned independently of the main Compose Multiplatform version, so the
+# built-in $compose.material3 accessor can't resolve it for Compose 1.11.1. Pin it explicitly
+# to the material3 that ships with CMP 1.11.1 (per its release notes).
+composeMaterial3 = "1.11.0-alpha07"
 
 [libraries]
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
@@ -33,3 +37,4 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 compose-material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "composeMaterialIconsExtended" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "composeMaterial3" }
