@@ -20,7 +20,7 @@ dependencies:
 
 dependencies@android:
   - $compose.uiTooling
-  - $libs.androidx.activity.compose # non-deprecated androidx.activity.compose.BackHandler (see PlatformBackHandler)
+  - $libs.androidx.activity.compose
   - $libs.kotlinx.coroutines.android
   - $libs.sqlDelight.driver.android
   - $libs.androidx.documentfile
@@ -45,7 +45,6 @@ settings:
     enabled: true
     resources:
       packageName: com.emilflach.groceries.resources
-      # Generate public accessors so other modules (and previews) can use Res.*
       exposedAccessors: true
     version: 1.11.1
   kotlin:

@@ -38,6 +38,14 @@ class ShoppingListViewModel(private val repository: ShoppingListRepository) {
         }
     }
 
+    fun addManualItem(name: String, onResult: (AddItemResult) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.addManual(name)
+            refresh()
+            onResult(result)
+        }
+    }
+
     fun setChecked(id: Long, checked: Boolean) {
         viewModelScope.launch {
             repository.setChecked(id, checked)

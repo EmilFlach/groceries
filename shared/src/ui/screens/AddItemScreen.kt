@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -27,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,6 +68,7 @@ fun AddItemScreen(
     initialFoods: List<LokcalFood>,
     onDismiss: () -> Unit,
     onFoodSelected: (LokcalFood) -> Unit,
+    onAddCustom: (String) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf(initialFoods) }
@@ -145,6 +149,18 @@ fun AddItemScreen(
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             )
 
+            // Anything the catalog doesn't have can still go on the list as a free-typed item.
+            val trimmedQuery = query.trim()
+            if (trimmedQuery.isNotEmpty()) {
+                AddCustomRow(
+                    name = trimmedQuery,
+                    onClick = {
+                        onAddCustom(trimmedQuery)
+                        dismiss()
+                    },
+                )
+            }
+
             if (!loaded) {
                 // First load in flight — don't flash a "no foods" message.
             } else if (results.isEmpty()) {
@@ -185,6 +201,37 @@ fun AddItemScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Tap target for adding the typed text as a custom item when it isn't in the Lokcal catalog. */
+@Composable
+private fun AddCustomRow(name: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = "Add \"$name\" as a custom item",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

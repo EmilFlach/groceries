@@ -17,6 +17,12 @@ SELECT * FROM ShoppingListItem ORDER BY checked_at IS NOT NULL, added_at DESC;
 selectActiveByFoodId:
 SELECT * FROM ShoppingListItem WHERE lokcal_food_id = ? AND checked_at IS NULL;
 
+-- Lowest food id on the list. Manually-added items get a unique negative synthetic id derived from
+-- this (see ShoppingListRepository.addManual) so they never collide with real (positive) Lokcal ids
+-- and each stays distinct under the active-food unique index.
+selectMinFoodId:
+SELECT MIN(lokcal_food_id) FROM ShoppingListItem;
+
 insertItem:
 INSERT INTO ShoppingListItem(lokcal_food_id, name, image_url) VALUES (?, ?, ?);
 

@@ -131,6 +131,45 @@ class ShoppingListRepositoryTest {
     }
 
     @Test
+    fun testAddManualItem() = runTest {
+        val result = repository.addManual("Napkins")
+
+        val all = repository.getAll()
+        assertEquals(1, all.size)
+        assertEquals("Napkins", all[0].name)
+        assertEquals(result.id, all[0].id)
+        assertNull(all[0].image_url)
+        assertNull(all[0].checked_at)
+        // Synthetic food id is negative so it never collides with real (positive) Lokcal ids.
+        assertTrue(all[0].lokcal_food_id < 0)
+    }
+
+    @Test
+    fun testMultipleManualItemsCoexist() = runTest {
+        // Each manual add gets its own negative id, so several stay active at once without the
+        // active-food unique index treating them as duplicates.
+        repository.addManual("Napkins")
+        repository.addManual("Batteries")
+        repository.addManual("Napkins")
+
+        val all = repository.getAll()
+        assertEquals(3, all.size)
+        assertEquals(3, all.map { it.lokcal_food_id }.distinct().size)
+        assertTrue(all.all { it.lokcal_food_id < 0 })
+    }
+
+    @Test
+    fun testManualItemDoesNotClashWithCatalogFood() = runTest {
+        repository.add(1L, "Milk", null)
+        repository.addManual("Napkins")
+
+        val all = repository.getAll()
+        assertEquals(2, all.size)
+        assertEquals(setOf(1L), all.filter { it.lokcal_food_id > 0 }.map { it.lokcal_food_id }.toSet())
+        assertEquals(1, all.count { it.lokcal_food_id < 0 })
+    }
+
+    @Test
     fun testReAddAfterChecked() = runTest {
         val first = repository.add(1L, "Milk", null) as AddItemResult.Added
         repository.setChecked(first.id, true)

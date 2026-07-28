@@ -99,6 +99,9 @@ fun App(
                 onFoodSelected = { food ->
                     shoppingListViewModel.addItem(food.id, food.name, food.imageUrl)
                 },
+                onAddCustom = { name ->
+                    shoppingListViewModel.addManualItem(name)
+                },
             )
         }
     }
