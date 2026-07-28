@@ -10,9 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Warm, food-first palette. Kept as private tokens here (never scattered as raw
-// Color(0xFF..) through the UI) — components read them via MaterialTheme.colorScheme.
-// Deliberately NOT the Material3 baseline purple, and no dynamicColor.
+// Warm, food-first palette — private tokens read via MaterialTheme.colorScheme, no dynamicColor.
 private val Cream = Color(0xFFFBF6EC)
 private val CreamSurface = Color(0xFFFFFFFF)
 private val CreamVariant = Color(0xFFF0E7D6)
@@ -94,7 +92,6 @@ private val AppTypography = Typography().let { base ->
     )
 }
 
-// Generous, characterful rounding — the food-image cards lean on the larger shapes.
 private val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(14.dp),

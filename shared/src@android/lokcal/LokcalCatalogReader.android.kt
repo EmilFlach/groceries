@@ -4,9 +4,18 @@ import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 actual class LokcalCatalogReader(private val context: Context) {
+
+    // Kept open for the app's lifetime (re-opening per query was slow). Serialized by [mutex], which
+    // guards the cache; reopened when the file changes underneath us (a re-import).
+    private val mutex = Mutex()
+    private var open: OpenSnapshot? = null
+
+    private class OpenSnapshot(val db: SQLiteDatabase, val stamp: Long, val size: Long)
 
     actual suspend fun hasSnapshot(): Boolean =
         withContext(Dispatchers.IO) { lokcalSnapshotFile(context).exists() }
@@ -20,18 +29,30 @@ actual class LokcalCatalogReader(private val context: Context) {
     actual suspend fun browseMealImages(limit: Int): List<String> =
         read(emptyList()) { it.mealImages(limit) }
 
-    /** Opens the snapshot read-only once, runs [block] against it, and always closes it — off the main thread. */
+    /** Runs [block] against the cached read-only snapshot — off the main thread and one at a time. */
     private suspend fun <T> read(default: T, block: suspend (LokcalSnapshotQueries) -> T): T =
         withContext(Dispatchers.IO) {
-            val file = lokcalSnapshotFile(context)
-            if (!file.exists()) return@withContext default
-            val db = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY)
-            try {
+            mutex.withLock {
+                val db = snapshot() ?: return@withLock default
                 block(AndroidLokcalQueries(db))
-            } finally {
-                db.close()
             }
         }
+
+    /** Returns the open snapshot, (re)opening it if it's missing or the file changed; null if none. */
+    private fun snapshot(): SQLiteDatabase? {
+        val file = lokcalSnapshotFile(context)
+        if (!file.exists()) {
+            open?.db?.close()
+            open = null
+            return null
+        }
+        val stamp = file.lastModified()
+        val size = file.length()
+        open?.let { if (it.db.isOpen && it.stamp == stamp && it.size == size) return it.db }
+        open?.db?.close()
+        return SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY)
+            .also { open = OpenSnapshot(it, stamp, size) }
+    }
 }
 
 private class AndroidLokcalQueries(private val db: SQLiteDatabase) : LokcalSnapshotQueries {

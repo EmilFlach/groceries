@@ -1,6 +1,8 @@
 package com.emilflach.groceries.lokcal
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.sqlite.SQLiteConfig
 import java.io.File
@@ -9,6 +11,13 @@ import java.sql.DriverManager
 import java.sql.ResultSet
 
 actual class LokcalCatalogReader {
+
+    // Kept open for the app's lifetime (re-opening per query was slow). Serialized by [mutex] since
+    // a JDBC SQLite connection isn't concurrent-safe; reopened when the file changes (a re-import).
+    private val mutex = Mutex()
+    private var open: OpenSnapshot? = null
+
+    private class OpenSnapshot(val connection: Connection, val stamp: Long, val size: Long)
 
     actual suspend fun hasSnapshot(): Boolean =
         withContext(Dispatchers.IO) { lokcalSnapshotFile().exists() }
@@ -22,15 +31,29 @@ actual class LokcalCatalogReader {
     actual suspend fun browseMealImages(limit: Int): List<String> =
         read(emptyList()) { it.mealImages(limit) }
 
-    /** Opens the snapshot read-only once, runs [block] against it, and always closes it — off the main thread. */
+    /** Runs [block] against the cached read-only snapshot — off the main thread and one at a time. */
     private suspend fun <T> read(default: T, block: suspend (LokcalSnapshotQueries) -> T): T =
         withContext(Dispatchers.IO) {
-            val file = lokcalSnapshotFile()
-            if (!file.exists()) return@withContext default
-            readOnlyConnection(file).use { connection ->
+            mutex.withLock {
+                val connection = snapshot() ?: return@withLock default
                 block(JdbcLokcalQueries(connection))
             }
         }
+
+    /** Returns the open connection, (re)opening it if it's missing or the file changed; null if none. */
+    private fun snapshot(): Connection? {
+        val file = lokcalSnapshotFile()
+        if (!file.exists()) {
+            open?.connection?.close()
+            open = null
+            return null
+        }
+        val stamp = file.lastModified()
+        val size = file.length()
+        open?.let { if (!it.connection.isClosed && it.stamp == stamp && it.size == size) return it.connection }
+        open?.connection?.close()
+        return readOnlyConnection(file).also { open = OpenSnapshot(it, stamp, size) }
+    }
 }
 
 /**
@@ -56,7 +79,7 @@ internal class JdbcLokcalQueries(private val connection: Connection) : LokcalSna
 
     override suspend fun selectAll(): List<LokcalFood> =
         query(LokcalSearchSql.SELECT_ALL, emptyList())
-
+    @Suppress("SqlSourceToSinkFlow")
     override suspend fun mealImages(limit: Int): List<String> =
         connection.prepareStatement(LokcalSearchSql.MEAL_IMAGES).use { statement ->
             statement.setInt(1, limit)

@@ -52,9 +52,7 @@ actual class LokcalImportRepository(private val context: Context) {
                 directory.stopAccessingSecurityScopedResource()
             }
         } catch (e: Exception) {
-            // Covers a revoked SAF permission (folder moved/deleted, grant revoked in system
-            // settings) as well as any other I/O failure — surfaced so the UI can prompt the
-            // user to reconfigure the folder rather than crashing.
+            // Revoked SAF permission or any I/O failure — surfaced so the UI can prompt a reconfigure.
             SyncResult.Failed(e.message ?: "Sync failed")
         }
     }

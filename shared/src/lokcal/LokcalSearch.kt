@@ -1,32 +1,23 @@
 package com.emilflach.groceries.lokcal
 
 /**
- * Platform-agnostic relevance search over the imported Lokcal snapshot.
- *
- * Ported from Lokcal's own `FoodRepository.search` / `Food.sq:searchRanked`
- * (`~/AndroidStudioProjects/Lokcal`). The snapshot Groceries reads *is* Lokcal's DB, so it
- * already carries the `FoodAlias` (synonyms) and `Intake` (how often a food was logged) tables
- * that make Lokcal's results feel relevant — we simply run the same ranking against it.
- *
- * The ranking + LIMIT live in SQL ([LokcalSearchSql.SEARCH_RANKED]); this file holds the Kotlin
- * cascade around it (barcode shortcut, multi-word token filter, and the accent-folding /
- * Levenshtein fallbacks that SQLite `LIKE` can't do). Each platform provides the raw row access
- * via [LokcalSnapshotQueries]; the relevance logic stays here, in one place, testable on the JVM.
+ * Platform-agnostic relevance search over the imported Lokcal snapshot, ported from Lokcal's own
+ * `FoodRepository.search`. SQL does the ranking ([LokcalSearchSql.SEARCH_RANKED]); this file holds
+ * the Kotlin cascade around it (barcode shortcut, token filter, accent/typo fallbacks), testable on JVM.
  */
 
 internal const val SEARCH_LIMIT = 100
 
-/** Raw, read-only access to a single opened Lokcal snapshot. One instance == one open connection. */
+/** Raw, read-only access to an opened Lokcal snapshot. */
 internal interface LokcalSnapshotQueries {
     /** Foods ordered by popularity (Intake track count) then name — the default browse ordering. */
     suspend fun browse(limit: Int): List<LokcalFood>
 
-    /** Exact barcode lookup. */
     suspend fun selectByGtin13(gtin13: String): List<LokcalFood>
 
     /**
-     * Foods whose name OR any alias matches [like] (a lowercased SQL LIKE pattern), ranked in SQL by
-     * exact(20) > prefix(10) > substring(0) on the name plus track count, tie-broken by name, capped at [limit].
+     * Foods whose name OR any alias matches [like], ranked by exact(20) > prefix(10) > substring(0)
+     * on the name plus track count, tie-broken by name, capped at [limit].
      */
     suspend fun searchRanked(like: String, qLower: String, limit: Int): List<LokcalFood>
 
@@ -37,7 +28,7 @@ internal interface LokcalSnapshotQueries {
     suspend fun mealImages(limit: Int): List<String>
 }
 
-/** SQL shared verbatim by the Android (`SQLiteDatabase`) and JVM (JDBC) actuals — both plain SQLite. */
+/** SQL shared by the Android (`SQLiteDatabase`) and JVM (JDBC) actuals — both plain SQLite. */
 internal object LokcalSearchSql {
     private const val COLS = "id, name, energy_kcal_per_100g, gtin13, image_url, product_url, source"
     private const val COLS_F = "f.id, f.name, f.energy_kcal_per_100g, f.gtin13, f.image_url, f.product_url, f.source"
@@ -114,7 +105,6 @@ internal suspend fun searchCatalog(query: String, queries: LokcalSnapshotQueries
 }
 
 private val charNormMap: Map<Char, String> = mapOf(
-    // Diacritics
     'à' to "a", 'á' to "a", 'â' to "a", 'ã' to "a", 'ä' to "a", 'å' to "a",
     'æ' to "ae",
     'ç' to "c",
@@ -128,7 +118,6 @@ private val charNormMap: Map<Char, String> = mapOf(
     'þ' to "th",
     'ß' to "ss",
     'œ' to "oe",
-    // Punctuation equivalences
     '&' to "and", // "Ben & Jerry's" ↔ "ben and jerry"
     '\'' to "", // strip ASCII apostrophe: "Jerry's" → "Jerrys"
     '’' to "", // strip right single quote (’): "Jerry's" → "Jerrys"

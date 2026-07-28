@@ -10,13 +10,9 @@ sealed interface SyncResult {
 }
 
 /**
- * Orchestrates getting a read-only copy of Lokcal's database onto this device: either by
- * syncing from the shared folder Lokcal's nightly Android backup writes to, or by manually
- * importing a single exported `.db` file. Only Android implements this today.
- *
- * [Database] (Groceries' own, used only to record sync-status metadata) is passed per-call
- * rather than held at construction time, since this repository must be constructable
- * before the database finishes its async load in `App()`.
+ * Gets a read-only copy of Lokcal's database onto this device — by syncing from the shared backup
+ * folder or importing a `.db` file (Android only). [Database] (used only for sync metadata) is
+ * passed per-call because this repository is constructed before the DB finishes loading in `App()`.
  */
 expect class LokcalImportRepository {
     suspend fun isFolderConfigured(): Boolean

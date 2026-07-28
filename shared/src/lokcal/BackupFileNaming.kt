@@ -3,11 +3,8 @@ package com.emilflach.groceries.lokcal
 private val BACKUP_FILE_REGEX = Regex("""^lokcal-backup-(\d+)\.db$""")
 
 /**
- * Picks the most recent Lokcal backup from a folder listing, using the epoch-millis
- * timestamp embedded in the filename by Lokcal's own nightly export
- * (`lokcal-backup-<epoch-millis>.db` — see BackupManager.android.kt in the Lokcal repo).
- * That export has no pruning, so a folder can contain many backups; this always picks
- * the newest one rather than assuming a single/fixed filename.
+ * Picks the newest Lokcal backup from a folder listing by the epoch-millis in its filename
+ * (`lokcal-backup-<epoch-millis>.db`). Lokcal's export doesn't prune, so many can accumulate.
  */
 fun pickLatestBackupFileName(names: List<String>): String? {
     return names

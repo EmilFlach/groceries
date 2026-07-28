@@ -16,11 +16,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 
-/**
- * A rounded food photo tile. Loads [url] via the app's Coil loader (already configured
- * globally); while loading, or when [url] is null, it shows a warm placeholder — so the
- * layout never jumps and empty items still read as food.
- */
+/** A rounded food photo tile; shows a warm placeholder while loading or when [url] is null. */
 @Composable
 fun FoodImage(
     url: String?,

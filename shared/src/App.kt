@@ -16,8 +16,9 @@ import com.emilflach.groceries.data.ShoppingListRepository
 import com.emilflach.groceries.data.SqlDriverFactory
 import com.emilflach.groceries.data.createDatabase
 import com.emilflach.groceries.lokcal.LokcalCatalogReader
+import com.emilflach.groceries.lokcal.LokcalFood
 import com.emilflach.groceries.lokcal.LokcalImportRepository
-import com.emilflach.groceries.ui.components.AddItemSheet
+import com.emilflach.groceries.ui.screens.AddItemScreen
 import com.emilflach.groceries.ui.screens.LokcalSetupScreen
 import com.emilflach.groceries.ui.screens.ShoppingListScreen
 import com.emilflach.groceries.ui.theme.AppTheme
@@ -54,17 +55,14 @@ fun App(
         }
 
         var screen by remember { mutableStateOf(Screen.ShoppingList) }
-        var showAddItemSheet by remember { mutableStateOf(false) }
+        var showAddItem by remember { mutableStateOf(false) }
         var hasSnapshot by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             hasSnapshot = lokcalCatalogReader.hasSnapshot()
         }
 
-        // Photos for the top collage — meal photos are preferred, topped up with food photos
-        // only to fill the mosaic. Each is shuffled so the collage varies per launch, with meals
-        // kept ahead of foods. Empty on platforms/states without a snapshot (the screen then
-        // falls back to the list items' own photos, and to a plain header if there are none).
+        // Top-collage photos: meals first, topped up with food photos, shuffled per launch.
         val collageImageUrls by produceState(emptyList<String>(), lokcalCatalogReader, hasSnapshot) {
             value = runCatching {
                 val meals = lokcalCatalogReader.browseMealImages(60).shuffled()
@@ -73,13 +71,18 @@ fun App(
             }.getOrDefault(emptyList())
         }
 
+        // Warm the picker's initial browse list at startup so opening "Add food" renders instantly.
+        val initialFoods by produceState(emptyList<LokcalFood>(), lokcalCatalogReader, hasSnapshot) {
+            value = runCatching { lokcalCatalogReader.browseFoods() }.getOrDefault(emptyList())
+        }
+
         when (screen) {
             Screen.ShoppingList -> ShoppingListScreen(
                 viewModel = shoppingListViewModel,
                 hasSnapshot = hasSnapshot,
                 collageImageUrls = collageImageUrls,
                 onOpenSetup = { screen = Screen.LokcalSetup },
-                onAddItem = { showAddItemSheet = true },
+                onAddItem = { showAddItem = true },
             )
 
             Screen.LokcalSetup -> LokcalSetupScreen(
@@ -88,10 +91,11 @@ fun App(
             )
         }
 
-        if (showAddItemSheet) {
-            AddItemSheet(
+        if (showAddItem) {
+            AddItemScreen(
                 catalogReader = lokcalCatalogReader,
-                onDismiss = { showAddItemSheet = false },
+                initialFoods = initialFoods,
+                onDismiss = { showAddItem = false },
                 onFoodSelected = { food ->
                     shoppingListViewModel.addItem(food.id, food.name, food.imageUrl)
                 },

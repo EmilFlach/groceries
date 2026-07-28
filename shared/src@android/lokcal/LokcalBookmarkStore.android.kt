@@ -21,7 +21,6 @@ actual object LokcalBookmarkStore {
             val bookmark = file!!.bookmarkData()
             bookmarkFile.write(bookmark.bytes)
         } catch (_: Exception) {
-            // Error saving bookmark
         }
     }
 
@@ -50,7 +49,6 @@ actual object LokcalBookmarkStore {
                 bookmarkFile.delete()
             }
         } catch (_: Exception) {
-            // Error clearing bookmark
         }
     }
 }

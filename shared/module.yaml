@@ -20,6 +20,7 @@ dependencies:
 
 dependencies@android:
   - $compose.uiTooling
+  - $libs.androidx.activity.compose # non-deprecated androidx.activity.compose.BackHandler (see PlatformBackHandler)
   - $libs.kotlinx.coroutines.android
   - $libs.sqlDelight.driver.android
   - $libs.androidx.documentfile

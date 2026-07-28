@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.emilflach.groceries.lokcal.SyncResult
+import com.emilflach.groceries.ui.util.PlatformBackHandler
 import com.emilflach.groceries.viewmodel.LokcalSetupViewModel
 
 @Composable
@@ -38,6 +39,10 @@ fun LokcalSetupScreen(
     onBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Route the system back gesture to the same destination as the on-screen back button, so it
+    // returns to the list instead of falling through to the OS and closing the app.
+    PlatformBackHandler { onBack() }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(

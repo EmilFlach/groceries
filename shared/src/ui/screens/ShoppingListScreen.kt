@@ -39,9 +39,7 @@ fun ShoppingListScreen(
     val items by viewModel.items.collectAsState()
     val toBuy = items.count { it.checked_at == null }
 
-    // Photos for the top collage. Prefer the catalog feed (meals first, then foods — already
-    // shuffled and prioritized upstream); when there's no snapshot to draw from, fall back to
-    // the list's own item photos so the collage still has something to show.
+    // Prefer the catalog feed; fall back to the list items' own photos when there's no snapshot.
     val collageUrls = remember(collageImageUrls, items) {
         if (collageImageUrls.isNotEmpty()) collageImageUrls
         else items.mapNotNull { it.image_url }.distinct().shuffled()
@@ -116,11 +114,7 @@ private fun countLabel(toBuy: Int, total: Int): String = when {
     else -> "$toBuy to buy" + (if (total - toBuy > 0) " · ${total - toBuy} in the cart" else "")
 }
 
-/**
- * The top of the screen: a random mosaic of food photos with the list count read out over a
- * bottom scrim, and the Lokcal-setup action tucked into the corner. Replaces the old title bar
- * so the app reads flat — no second header stacked under the window chrome.
- */
+/** Mosaic of food photos with the list count over a bottom scrim and the setup action in the corner. */
 @Composable
 private fun CollageHeader(imageUrls: List<String>, toBuy: Int, total: Int, onOpenSetup: () -> Unit) {
     Box(
@@ -132,7 +126,6 @@ private fun CollageHeader(imageUrls: List<String>, toBuy: Int, total: Int, onOpe
     ) {
         FoodCollage(imageUrls = imageUrls, modifier = Modifier.fillMaxSize())
 
-        // Scrim so the count stays legible over whatever photos land at the bottom edge.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -201,10 +194,6 @@ private fun FlatHeader(toBuy: Int, total: Int, onOpenSetup: () -> Unit) {
     }
 }
 
-/**
- * A mosaic of up to six food photos laid out across columns of varying tile counts, so the
- * band reads as a collage rather than a plain grid. Photos are pre-shuffled by the caller.
- */
 @Composable
 private fun FoodCollage(imageUrls: List<String>, modifier: Modifier = Modifier) {
     val columns = remember(imageUrls) {
