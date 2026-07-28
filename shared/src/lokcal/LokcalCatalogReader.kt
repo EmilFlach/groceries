@@ -9,4 +9,7 @@ expect class LokcalCatalogReader {
     suspend fun hasSnapshot(): Boolean
     suspend fun browseFoods(limit: Int = 100): List<LokcalFood>
     suspend fun searchFoods(query: String): List<LokcalFood>
+
+    /** Image URLs of meals that have a photo (newest first) — the collage prefers these over food photos. */
+    suspend fun browseMealImages(limit: Int = 100): List<String>
 }

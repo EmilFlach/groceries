@@ -3,7 +3,6 @@ package com.emilflach.groceries
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,6 +20,8 @@ import com.emilflach.groceries.lokcal.LokcalImportRepository
 import com.emilflach.groceries.ui.components.AddItemSheet
 import com.emilflach.groceries.ui.screens.LokcalSetupScreen
 import com.emilflach.groceries.ui.screens.ShoppingListScreen
+import com.emilflach.groceries.ui.theme.AppTheme
+import com.emilflach.groceries.ui.util.ConfigureCoilImageLoader
 import com.emilflach.groceries.viewmodel.LokcalSetupViewModel
 import com.emilflach.groceries.viewmodel.ShoppingListViewModel
 
@@ -32,7 +33,9 @@ fun App(
     lokcalCatalogReader: LokcalCatalogReader,
     lokcalImportRepository: LokcalImportRepository,
 ) {
-    MaterialTheme {
+    AppTheme {
+        ConfigureCoilImageLoader()
+
         val database by produceState<Database?>(null) {
             value = createDatabase(sqlDriverFactory)
         }
@@ -41,7 +44,7 @@ fun App(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            return@MaterialTheme
+            return@AppTheme
         }
 
         val shoppingListRepository = remember(db) { ShoppingListRepository(db) }
@@ -58,10 +61,23 @@ fun App(
             hasSnapshot = lokcalCatalogReader.hasSnapshot()
         }
 
+        // Photos for the top collage — meal photos are preferred, topped up with food photos
+        // only to fill the mosaic. Each is shuffled so the collage varies per launch, with meals
+        // kept ahead of foods. Empty on platforms/states without a snapshot (the screen then
+        // falls back to the list items' own photos, and to a plain header if there are none).
+        val collageImageUrls by produceState(emptyList<String>(), lokcalCatalogReader, hasSnapshot) {
+            value = runCatching {
+                val meals = lokcalCatalogReader.browseMealImages(60).shuffled()
+                val foods = lokcalCatalogReader.browseFoods(60).mapNotNull { it.imageUrl }.shuffled()
+                (meals + foods).distinct()
+            }.getOrDefault(emptyList())
+        }
+
         when (screen) {
             Screen.ShoppingList -> ShoppingListScreen(
                 viewModel = shoppingListViewModel,
                 hasSnapshot = hasSnapshot,
+                collageImageUrls = collageImageUrls,
                 onOpenSetup = { screen = Screen.LokcalSetup },
                 onAddItem = { showAddItemSheet = true },
             )

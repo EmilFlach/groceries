@@ -1,139 +1,42 @@
 # Groceries — Claude Code Instructions
 
-## Project
-Kotlin Multiplatform (KMP) + Compose Multiplatform app.
-Targets: Android, iOS, Desktop (JVM), Web (WASM).
-Package: `com.emilflach.groceries`.
+KMP + Compose Multiplatform app (Android, iOS, Desktop/JVM, Web/WASM). Package `com.emilflach.groceries`.
 
-> **Status:** local-first shopping list (Step 1 of the smart-groceries roadmap) is in place —
-> SQLDelight-backed `ShoppingListRepository`, plus a read-only bridge into a sibling
-> **Lokcal** app's food database (see "Lokcal integration" below). No Mealie integration,
-> pantry-depletion suggestions, or recipe suggestions yet (Steps 2–3) — don't assume those
-> exist until you see them in the tree.
+**Status:** local-first shopping list (roadmap Step 1) — SQLDelight `ShoppingListRepository` + a read-only bridge into the sibling **Lokcal** app's food DB. No Mealie / pantry-depletion / recipe suggestions yet (Steps 2–3); don't assume they exist.
 
-## Build & Test Strategy
+## Build & test
+**Kotlin Toolchain** via `./kotlin` — **not Gradle**. Modules in `module.yaml` + `project.yaml`; deps in root `libs.versions.toml` as `$libs.*` (built-in `$compose.*` needs no entry). Compile JVM/desktop first (fastest); build per-module with `-m` (avoid bare `./kotlin build`); Android needs `ANDROID_HOME`.
 
-This project is built with the **Kotlin Toolchain** via the `./kotlin`
-wrapper — **not Gradle**. There are no Gradle build files; modules are declared in
-`module.yaml` + `project.yaml`. The dependency catalog is `libs.versions.toml` at the
-**project root**, consumed natively as `$libs.*` (built-in catalogs like `$compose.*` need
-no entry there).
+| Changed | Build | Test |
+|---|---|---|
+| `shared/src/` (common) or `src@jvm/` | `./kotlin build -m desktopApp` | `./kotlin test -m shared -p jvm` — **default, ~95%** |
+| `src@android/` or `androidApp/` | `ANDROID_HOME=… ./kotlin build -m androidApp` | `./kotlin test -m shared -p android` |
+| `src@ios/` or `iosApp/` | `./kotlin build -m shared -p iosSimulatorArm64` (full app: `-m iosApp`) | `… -p iosSimulatorArm64` (needs Xcode) |
+| `src@wasmJs/` or `webApp/` | `./kotlin build -m webApp` | `./kotlin test -m shared -p wasmJs` |
+| pre-release | `./kotlin build` (all) | `./kotlin check` |
 
-**Rules:** Compile the JVM/desktop target first (fastest) to catch errors. Build per-module
-(`-m`); avoid bare `./kotlin build` (builds every target). Always build → test → fix.
-Android builds need `ANDROID_HOME` set.
+Run: `./kotlin run -m desktopApp` (discover tasks with `./kotlin show`). Hot reload: add `--compose-hot-reload-mode` — a persistent session; stop with **Ctrl-C**, not by closing the window (else the DevTools sidecar orphans: `pkill -f 'apple.awt.application.name=Compose'`). For UI screenshots/validation, Compose Hot Reload has an MCP server (`take_screenshot`, `get_semantic_tree`, `click`/`type_text`/…), but it's exposed only as a Gradle `hotMcpServer` task this Toolchain project doesn't have yet — until then, screenshot the running desktop app.
 
-**Compose Hot Reload (desktop):** `./kotlin run -m desktopApp --compose-hot-reload-mode`.
-It's a persistent session — **stop it with Ctrl-C in the launching terminal**, not by
-closing the app window, or the DevTools sidecar window orphans and piles up across runs
-(clear stragglers: `pkill -f 'apple.awt.application.name=Compose'`).
+## Layout
+Modules: `shared` (kmp/lib), `androidApp`, `desktopApp`, `webApp`, `iosApp`.
 
-### Platform Commands
+Toolchain layout (no `commonMain/kotlin`): common in `shared/src/`, actuals in `src@<platform>/`, tests in `test/` (+ `test@jvm/`). `src@native/` = all iOS targets collectively (shared native code, e.g. the SQLDelight driver); `src@ios/` = iOS-only (e.g. `Platform.ios.kt`). SQLDelight `.sq` files live in `sqldelight/com/emilflach/groceries/` — **directory nesting must mirror `packageName`**.
 
-| Changed | Build | Test | Notes |
-|---------|-------|------|-------|
-| `shared/src/` (common) or `shared/src@jvm/` | `./kotlin build -m desktopApp` | `./kotlin test -m shared -p jvm` | **Default — use for 95% of changes** |
-| `shared/src@android/` or `androidApp/` | `ANDROID_HOME=… ./kotlin build -m androidApp` | `./kotlin test -m shared -p android` | Embedded Gradle for AGP |
-| `shared/src@ios/` or `iosApp/` | `./kotlin build -m shared -p iosSimulatorArm64`<br>(full app: `./kotlin build -m iosApp`) | `./kotlin test -m shared -p iosSimulatorArm64` | Needs Xcode |
-| `shared/src@wasmJs/` (web) or `webApp/` | `./kotlin build -m webApp` | `./kotlin test -m shared -p wasmJs` | |
-| Pre-release verification | `./kotlin build` (all targets) | `./kotlin check` (tests + checks) | |
+`shared/src/` holds: `App.kt` (root `App(sqlDriverFactory, lokcalCatalogReader, lokcalImportRepository)` — loads `Database`, wires repos/ViewModels, switches `ShoppingListScreen`/`LokcalSetupScreen`; no `@Preview`, needs real platform deps), `Platform.kt`, `data/`, `lokcal/` (bridge — see below), `viewmodel/` (plain `StateFlow` classes with their own `CoroutineScope(Dispatchers.Main)`, no androidx `ViewModel`), `ui/{screens,components,theme}/`. `expect`/`actual` is used for all platform code (`platformName`, `SqlDriverFactory`, the `Lokcal*` classes).
 
-Run the desktop app: `./kotlin run -m desktopApp`. Discover tasks/modules/settings with
-`./kotlin show` and custom commands with `./kotlin do`.
+Entry points build the platform actuals and pass them to `App(...)`, each calling `FileKit.init(...)` first (Android `FileKit.init(this)`; desktop `FileKit.init(appId = "Groceries")`). iOS: `ViewController.kt` → `ComposeUIViewController { App(...) }`, wrapped by `iosApp.swift` (`import KotlinModules`).
 
-## Code Structure
+## Dependencies & gotchas
+CMP `foundation`/`material3`/`preview`/`hotReload.runtimeApi` (+ `uiTooling` on Android); Coil3 (`coil-compose` + `coil-network-ktor3`) + Ktor load the remote food photos (loader set up in `ui/util/CoilSetup.kt`); desktop needs `logback-classic` + **`kotlinx-coroutines-swing`** (else any `Dispatchers.Main` use throws "Module with the Main dispatcher is missing" at runtime).
 
-**Modules** (`project.yaml` lists them): `shared` (`kmp/lib`), `androidApp`
-(`android/app`), `desktopApp` (`jvm/app`), `webApp` (`wasm-js/app`), `iosApp` (`ios/app`).
-
-**`shared` uses the Kotlin Toolchain layout** (no `commonMain/kotlin`): common code in `shared/src/`,
-platform actuals in `shared/src@android/`, `src@jvm/`, `src@ios/`, `src@wasmJs/`; tests go
-in `shared/test/` (+ `test@jvm/`, etc.). `src@native/` also exists now — it covers all three
-iOS targets collectively (Kotlin's `native` source set sits above `iosArm64`/`iosX64`/
-`iosSimulatorArm64` in the hierarchy), used for code like the SQLDelight native driver that's
-identical across them; `src@ios/` is still for genuinely iOS-only code (e.g. `Platform.ios.kt`).
-
-**Current paths under `shared/`:**
-- `src/App.kt` — root `App(sqlDriverFactory, lokcalCatalogReader, lokcalImportRepository)`
-  composable; loads the `Database`, wires repositories/ViewModels, switches between
-  `ShoppingListScreen`/`LokcalSetupScreen`. No `@Preview`/`@DevelopmentEntryPoint` — it
-  requires real platform dependencies, so hot reload isn't wired up at this level (matches
-  Lokcal's own `App(sqlDriverFactory)` precedent).
-- `src/Platform.kt` — `expect fun platformName()`, with actuals per `src@<platform>/`
-- `src/data/` — `SqlDriverFactory` (expect/actual, opens Groceries' own `groceries.db`) and
-  `ShoppingListRepository`
-- `src/lokcal/` — the read-only Lokcal bridge (see below)
-- `src/viewmodel/` — `ShoppingListViewModel`, `LokcalSetupViewModel`: plain
-  `StateFlow`-holding classes with their own `CoroutineScope(Dispatchers.Main)`, no
-  `androidx.lifecycle.ViewModel` dependency (same pattern as Lokcal's `viewmodel/` package)
-- `src/ui/screens/`, `src/ui/components/` — `ShoppingListScreen`, `LokcalSetupScreen`,
-  `AddItemSheet`, `ShoppingListItemRow`
-- `sqldelight/com/emilflach/groceries/` — `ShoppingListItem.sq`, `Meta.sq` (unlike other
-  `.sq`-adjacent code, these files' directory nesting must mirror `packageName` — SQLDelight
-  requires it)
-- `composeResources/` — Compose resources; `Res` accessors →
-  `com.emilflach.groceries.resources` (`exposedAccessors: true`, so previews and other
-  modules can use `Res.*`). Currently empty — the starter demo strings/drawable were removed
-  once real UI landed.
-
-**App entry points** construct the platform actuals and pass them into `App(...)`:
-- `desktopApp/src/main.kt` — `application { FileKit.init(appId = "Groceries"); Window { App(...) } }`
-- `webApp/src/main.kt` — `ComposeViewport(document.body!!) { App(...) }`
-- `androidApp/src/MainActivity.kt` — `FileKit.init(this)` then `setContent { App(...) }`
-- `iosApp/src/ViewController.kt` — `ComposeUIViewController { App(...) }`, wrapped by
-  `iosApp/src/iosApp.swift` (`import KotlinModules`, `ViewControllerKt.ViewController()`)
-
-## Stack
-- Kotlin Multiplatform + Compose Multiplatform, built with the Kotlin Toolchain.
-- Compose deps declared in `shared/module.yaml`: `foundation`, `material3`, `preview`,
-  `hotReload.runtimeApi`, `material-icons-extended` (pinned to `1.7.3` — Compose
-  Multiplatform stopped publishing this artifact after that version) (+ `uiTooling` on
-  Android).
-- **SQLDelight** (`plugins/sqldelight`, vendored verbatim from Lokcal's own local Amper
-  plugin) — `generateAsync: true`, so all generated queries are suspend-based
-  (`awaitAsList()`/`awaitAsOne()`/`awaitAsOneOrNull()` from
-  `app.cash.sqldelight.async.coroutines`). iOS needs `settings@ios.kotlin.linkerOptions:
-  [-lsqlite3]` in `shared/module.yaml` to link the native driver's KLib — but that setting
-  does **not** reach the final app-level link; `iosApp/module.xcodeproj/project.pbxproj`
-  also needs `OTHER_LDFLAGS = "-lsqlite3";` set directly on both the Debug and Release
-  build configurations (Amper won't regenerate an existing project, so this persists).
-- **FileKit** (`filekit-core`/`filekit-dialogs`/`filekit-dialogs-compose`) for file/folder
-  pickers and the Android SAF bookmark flow. `FileKit.init(...)` must run once per platform
-  entry point before any picker/bookmark call.
-- Desktop uses `compose.desktop.currentOs` + `logback-classic` + **`kotlinx-coroutines-swing`**
-  (required — without it, any `Dispatchers.Main` use throws `IllegalStateException: Module
-  with the Main dispatcher is missing` at runtime on JVM); Android uses
-  `androidx-activity-compose`.
-- Any module using FileKit directly (not just transitively via `shared`) must declare
-  `$libs.filekit.core` itself — Amper doesn't re-expose `shared`'s dependencies to consumers.
-
-## Architecture
-`expect`/`actual` for platform-specific code: `platformName()`, `SqlDriverFactory`,
-`LokcalCatalogReader`, `LokcalImportRepository`, `LokcalBookmarkStore`. Repository / ViewModel
-(StateFlow) layers live in `src/data/` and `src/viewmodel/`.
+- **Verify every KMP dependency on [klibs.io](https://klibs.io)** — the KMP source of truth (MCP `https://api.klibs.io/mcp`; pages `klibs.io/package/<group>/<artifact>`). Confirm coordinates, the newest **stable** version, and target support before adding or bumping; don't guess from READMEs.
+- **Kotlin toolchain (2.3.21) rejects newer-ABI KLIBs** — a lib whose native klib was built with Kotlin 2.4.0+ fails the iOS/native build with "incompatible ABI version" (why **`filekit 0.14.2` currently breaks iOS**). Check the release's Kotlin version on klibs.io before bumping.
+- **Amper doesn't re-expose transitive deps** — a module must declare libs it uses directly (e.g. `desktopApp` declares `$libs.filekit.core`), and anything you `import` must be a direct dependency even if it rides in transitively (e.g. `org.xerial:sqlite-jdbc` via the SQLDelight sqlite driver).
+- **Compose Material3 is versioned independently** of CMP — `$compose.material3` won't resolve once Compose is pinned, so it's declared explicitly (`composeMaterial3`), as is `material-icons-extended` (`1.7.3`; CMP stopped publishing later versions).
+- **SQLDelight** (`plugins/sqldelight`, vendored from Lokcal; `generateAsync: true` → suspend `awaitAs*` queries) — iOS needs `settings@ios.kotlin.linkerOptions: [-lsqlite3]` in `shared/module.yaml` **and** `OTHER_LDFLAGS = "-lsqlite3";` on both Debug + Release configs in `iosApp/module.xcodeproj/project.pbxproj` (the yaml setting doesn't reach the app-level link; Amper won't regenerate the project).
 
 ## Lokcal integration
-Lokcal (sibling app, `~/AndroidStudioProjects/Lokcal`) is a separate KMP app with its own
-local SQLite database (`Food`, `Intake`, `Meal`/`MealItem` tables) — no API, no shared
-backend. On Android, Lokcal copies its DB nightly to a user-chosen SAF folder
-(`lokcal-backup-<epoch-millis>.db`, no pruning). Groceries reads from that same folder as a
-**separate SAF permission grant** — Android's persistable URI permissions are scoped per
-requesting app, so Groceries always needs its own folder-picker flow even when pointed at
-the exact folder Lokcal already uses (see `LokcalSetupScreen`/`LokcalImportRepository`).
+Lokcal (`~/AndroidStudioProjects/Lokcal`) — a separate KMP app with its own local SQLite DB (`Food`, `Intake`, `Meal`/`MealItem`), no API. On Android it nightly-copies its DB to a user-chosen SAF folder (`lokcal-backup-<epoch-millis>.db`, no pruning). Groceries reads it via its **own** SAF grant (persistable URI permissions are per-app → Groceries needs its own folder picker even for the same folder), using **hand-written raw SQL on a read-only `SQLiteDatabase`** (`LokcalCatalogReader.android.kt`), not a 2nd SQLDelight schema (avoids an extra Amper module + build coupling to Lokcal's schema). **Android-only today**; `src@jvm/`/`src@native/`/`src@wasmJs/` are stubs (`hasSnapshot() = false`).
 
-Reading Lokcal's data is **hand-written raw SQL against a plain read-only
-`SQLiteDatabase`** (`LokcalCatalogReader.android.kt`), not a second SQLDelight-compiled
-schema — this avoids a second Amper module just for a handful of read queries, and avoids
-Groceries' build breaking on unrelated Lokcal schema changes. Only Android has a real
-implementation today; `src@jvm/`, `src@native/`, `src@wasmJs/` are honest stubs
-(`hasSnapshot() = false`, `SyncResult.Failed("...only available on Android right now")`) —
-don't assume Lokcal data is reachable on those platforms yet.
-
-## iOS — What Needs Implementing Twice
-Swift sources live in `iosApp/src/` and `import KotlinModules` (the Kotlin Toolchain's framework name).
-The Kotlin Toolchain generates `iosApp/module.xcodeproj` on first build; the committed
-`project.pbxproj` is tracked while the rest of `module.xcodeproj/` is gitignored. Today
-there's a single `ViewController()` factory bridged by `ComposeView`
-(`UIViewControllerRepresentable`) in `iosApp.swift`. Once per-screen native navigation is
-introduced, wire each new screen through a `*ViewController()` factory + its SwiftUI
-wrapper here.
+## iOS bridge
+Swift in `iosApp/src/` does `import KotlinModules`. The Toolchain generates `iosApp/module.xcodeproj` on first build; only `project.pbxproj` is tracked (rest gitignored). One `ViewController()` factory bridged by `ComposeView` in `iosApp.swift`; for per-screen native nav, add a `*ViewController()` factory + SwiftUI wrapper per screen.

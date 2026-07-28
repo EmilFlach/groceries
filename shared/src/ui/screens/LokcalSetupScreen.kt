@@ -2,27 +2,36 @@ package com.emilflach.groceries.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.emilflach.groceries.lokcal.SyncResult
 import com.emilflach.groceries.viewmodel.LokcalSetupViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LokcalSetupScreen(
     viewModel: LokcalSetupViewModel,
@@ -30,55 +39,105 @@ fun LokcalSetupScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Lokcal setup") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
-            )
-        },
-    ) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                if (uiState.folderConfigured) "Backup folder configured" else "No backup folder configured yet",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                uiState.lastSyncedAt?.let { "Last synced: $it" } ?: "Never synced",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-
-            Button(onClick = viewModel::chooseFolder, enabled = !uiState.isBusy) {
-                Text(if (uiState.folderConfigured) "Change backup folder" else "Choose backup folder")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "Lokcal setup",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
             }
 
-            if (uiState.folderConfigured) {
-                OutlinedButton(onClick = viewModel::syncNow, enabled = !uiState.isBusy) {
-                    Text("Sync now")
+            // Status card
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(16.dp)) {
+                    Icon(
+                        if (uiState.folderConfigured) Icons.Filled.CheckCircle else Icons.Outlined.FolderOpen,
+                        contentDescription = null,
+                        tint = if (uiState.folderConfigured) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = if (uiState.folderConfigured) "Backup folder configured" else "No backup folder yet",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = uiState.lastSyncedAt?.let { "Last synced: $it" } ?: "Never synced",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
-            OutlinedButton(onClick = viewModel::importFromFile, enabled = !uiState.isBusy) {
-                Text("Import a single .db file instead")
+            Button(
+                onClick = viewModel::chooseFolder,
+                enabled = !uiState.isBusy,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (uiState.folderConfigured) "Change backup folder" else "Choose backup folder",
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
+
+            if (uiState.folderConfigured) {
+                OutlinedButton(
+                    onClick = viewModel::syncNow,
+                    enabled = !uiState.isBusy,
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Sync now") }
+            }
+
+            OutlinedButton(
+                onClick = viewModel::importFromFile,
+                enabled = !uiState.isBusy,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Import a single .db file instead") }
 
             uiState.lastResult?.let { result ->
                 Text(
-                    when (result) {
+                    text = when (result) {
                         SyncResult.Success -> "Synced successfully"
                         SyncResult.NoFolderConfigured -> "No folder configured"
                         SyncResult.NoBackupFileFound -> "No backup file found in that folder"
                         is SyncResult.Failed -> "Failed: ${result.message}"
                     },
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (result is SyncResult.Failed) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.primary,
                 )
             }
 
             if (uiState.isBusy) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Working…", style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }
