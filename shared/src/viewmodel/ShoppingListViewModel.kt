@@ -45,6 +45,20 @@ class ShoppingListViewModel(private val repository: ShoppingListRepository) {
         }
     }
 
+    fun checkAll() {
+        viewModelScope.launch {
+            repository.checkAll()
+            refresh()
+        }
+    }
+
+    fun uncheckAll() {
+        viewModelScope.launch {
+            repository.uncheckAll()
+            refresh()
+        }
+    }
+
     fun remove(id: Long) {
         viewModelScope.launch {
             repository.remove(id)

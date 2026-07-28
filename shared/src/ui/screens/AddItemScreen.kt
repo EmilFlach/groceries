@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -72,6 +73,7 @@ fun AddItemScreen(
 
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val gridState = rememberLazyGridState()
 
     val dismiss = {
         keyboard?.hide()
@@ -84,6 +86,11 @@ fun AddItemScreen(
         if (query.isNotBlank()) delay(250.milliseconds)
         results = if (query.isBlank()) catalogReader.browseFoods() else catalogReader.searchFoods(query)
         loaded = true
+    }
+
+    // A new query yields a fresh result set — scroll back to the top so the best matches are visible.
+    LaunchedEffect(results) {
+        if (results.isNotEmpty()) gridState.scrollToItem(0)
     }
 
     LaunchedEffect(loaded) {
@@ -155,6 +162,7 @@ fun AddItemScreen(
                 }
             } else {
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Fixed(3),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),

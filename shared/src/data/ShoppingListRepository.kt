@@ -34,6 +34,15 @@ class ShoppingListRepository(database: Database) {
         queries.setChecked(if (checked) Clock.System.now().toString() else null, id)
     }
 
+    @OptIn(ExperimentalTime::class)
+    suspend fun checkAll() {
+        queries.checkAll(Clock.System.now().toString())
+    }
+
+    suspend fun uncheckAll() {
+        queries.uncheckAll()
+    }
+
     suspend fun remove(id: Long) {
         queries.deleteById(id)
     }

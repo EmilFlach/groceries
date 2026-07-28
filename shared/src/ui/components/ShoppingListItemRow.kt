@@ -33,32 +33,33 @@ fun ShoppingListItemRow(
     item: ShoppingListItem,
     onCheckedChange: (Boolean) -> Unit,
     onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val checked = item.checked_at != null
     Surface(
         onClick = { onCheckedChange(!checked) },
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.medium,
         color = if (checked) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
         tonalElevation = if (checked) 0.dp else 1.dp,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             Box(contentAlignment = Alignment.BottomEnd) {
                 FoodImage(
                     url = item.image_url,
                     name = item.name,
-                    modifier = Modifier.size(64.dp),
-                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.size(44.dp),
+                    shape = RoundedCornerShape(12.dp),
                     dimmed = checked,
                 )
                 if (checked) {
                     Box(
                         modifier = Modifier
-                            .padding(4.dp)
-                            .size(24.dp)
+                            .padding(2.dp)
+                            .size(18.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center,
@@ -67,30 +68,31 @@ fun ShoppingListItemRow(
                             Icons.Filled.Check,
                             contentDescription = "Checked off",
                             tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(12.dp),
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
 
             Text(
                 text = item.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None,
                 color = if (checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
 
-            IconButton(onClick = onRemove) {
+            IconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
                 Icon(
                     Icons.Outlined.DeleteOutline,
                     contentDescription = "Remove ${item.name}",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }

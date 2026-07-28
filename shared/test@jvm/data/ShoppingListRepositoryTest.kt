@@ -75,6 +75,62 @@ class ShoppingListRepositoryTest {
     }
 
     @Test
+    fun testCheckAllChecksEverything() = runTest {
+        repository.add(1L, "Milk", null)
+        repository.add(2L, "Eggs", null)
+
+        repository.checkAll()
+
+        val all = repository.getAll()
+        assertEquals(2, all.size)
+        assertTrue(all.all { it.checked_at != null })
+    }
+
+    @Test
+    fun testCheckAllLeavesAlreadyCheckedItems() = runTest {
+        val milk = repository.add(1L, "Milk", null) as AddItemResult.Added
+        repository.add(2L, "Eggs", null)
+        repository.setChecked(milk.id, true)
+
+        repository.checkAll()
+
+        // Everything ends up checked, and the pre-checked item isn't disturbed.
+        val all = repository.getAll()
+        assertEquals(2, all.size)
+        assertTrue(all.all { it.checked_at != null })
+    }
+
+    @Test
+    fun testUncheckAllRevivesEverything() = runTest {
+        val milk = repository.add(1L, "Milk", null) as AddItemResult.Added
+        val eggs = repository.add(2L, "Eggs", null) as AddItemResult.Added
+        repository.setChecked(milk.id, true)
+        repository.setChecked(eggs.id, true)
+
+        repository.uncheckAll()
+
+        val all = repository.getAll()
+        assertEquals(2, all.size)
+        assertTrue(all.all { it.checked_at == null })
+    }
+
+    @Test
+    fun testUncheckAllSkipsFoodAlreadyActive() = runTest {
+        // Same food both checked and re-added as active — reviving the checked row would
+        // violate the active-food unique index, so uncheckAll must leave it checked.
+        val first = repository.add(1L, "Milk", null) as AddItemResult.Added
+        repository.setChecked(first.id, true)
+        repository.add(1L, "Milk", null) as AddItemResult.Added
+
+        repository.uncheckAll()
+
+        val all = repository.getAll()
+        assertEquals(2, all.size)
+        assertEquals(1, all.count { it.checked_at == null })
+        assertEquals(1, all.count { it.checked_at != null })
+    }
+
+    @Test
     fun testReAddAfterChecked() = runTest {
         val first = repository.add(1L, "Milk", null) as AddItemResult.Added
         repository.setChecked(first.id, true)

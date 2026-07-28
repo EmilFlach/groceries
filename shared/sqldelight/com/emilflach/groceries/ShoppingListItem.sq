@@ -26,5 +26,22 @@ SELECT last_insert_rowid();
 setChecked:
 UPDATE ShoppingListItem SET checked_at = ? WHERE id = ?;
 
+-- Checks off everything still "to buy" at once. Setting checked_at only removes rows from the
+-- active-food unique index (which is partial on checked_at IS NULL), so it can't conflict.
+checkAll:
+UPDATE ShoppingListItem SET checked_at = ? WHERE checked_at IS NULL;
+
+-- Restores checked items to the "to buy" section. Only the latest checked row per food is
+-- revived, and only when no active row already holds that food, so the active-food unique
+-- index above can't be violated (a food can be both checked and re-added as active).
+uncheckAll:
+UPDATE ShoppingListItem SET checked_at = NULL
+WHERE id IN (
+    SELECT MAX(id) FROM ShoppingListItem
+    WHERE checked_at IS NOT NULL
+      AND lokcal_food_id NOT IN (SELECT lokcal_food_id FROM ShoppingListItem WHERE checked_at IS NULL)
+    GROUP BY lokcal_food_id
+);
+
 deleteById:
 DELETE FROM ShoppingListItem WHERE id = ?;
