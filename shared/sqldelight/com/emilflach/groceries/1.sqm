@@ -1,0 +1,14 @@
+-- Adds supermarket-aisle ordering: an Aisle catalog and a food -> aisle label map.
+-- Fresh installs get these tables straight from the .sq CREATE statements; this migration
+-- brings existing databases (schema v1) up to v2. Default aisles are seeded at app startup
+-- (FoodLabelRepository.ensureDefaultAisles), not here.
+CREATE TABLE Aisle (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL
+);
+
+CREATE TABLE FoodLabel (
+    food_key TEXT PRIMARY KEY,
+    aisle_id INTEGER NOT NULL
+);

@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.emilflach.groceries.data.FoodLabelRepository
 import com.emilflach.groceries.data.ShoppingListRepository
 import com.emilflach.groceries.data.SqlDriverFactory
 import com.emilflach.groceries.data.createDatabase
@@ -19,14 +20,16 @@ import com.emilflach.groceries.lokcal.LokcalCatalogReader
 import com.emilflach.groceries.lokcal.LokcalFood
 import com.emilflach.groceries.lokcal.LokcalImportRepository
 import com.emilflach.groceries.ui.screens.AddItemScreen
+import com.emilflach.groceries.ui.screens.AisleSettingsScreen
 import com.emilflach.groceries.ui.screens.LokcalSetupScreen
 import com.emilflach.groceries.ui.screens.ShoppingListScreen
 import com.emilflach.groceries.ui.theme.AppTheme
 import com.emilflach.groceries.ui.util.ConfigureCoilImageLoader
+import com.emilflach.groceries.viewmodel.AisleSettingsViewModel
 import com.emilflach.groceries.viewmodel.LokcalSetupViewModel
 import com.emilflach.groceries.viewmodel.ShoppingListViewModel
 
-private enum class Screen { ShoppingList, LokcalSetup }
+private enum class Screen { ShoppingList, LokcalSetup, AisleSettings }
 
 @Composable
 fun App(
@@ -49,10 +52,20 @@ fun App(
         }
 
         val shoppingListRepository = remember(db) { ShoppingListRepository(db) }
-        val shoppingListViewModel = remember(shoppingListRepository) { ShoppingListViewModel(shoppingListRepository) }
+        val foodLabelRepository = remember(db) { FoodLabelRepository(db) }
+        val shoppingListViewModel = remember(shoppingListRepository, foodLabelRepository) {
+            ShoppingListViewModel(shoppingListRepository, foodLabelRepository)
+        }
+
+        // Seed the default supermarket aisles once, then reload so grouping picks them up.
+        LaunchedEffect(foodLabelRepository) {
+            foodLabelRepository.ensureDefaultAisles()
+            shoppingListViewModel.refresh()
+        }
         val lokcalSetupViewModel = remember(lokcalImportRepository, db) {
             LokcalSetupViewModel(lokcalImportRepository, db)
         }
+        val aisleSettingsViewModel = remember(foodLabelRepository) { AisleSettingsViewModel(foodLabelRepository) }
 
         var screen by remember { mutableStateOf(Screen.ShoppingList) }
         var showAddItem by remember { mutableStateOf(false) }
@@ -87,7 +100,20 @@ fun App(
 
             Screen.LokcalSetup -> LokcalSetupScreen(
                 viewModel = lokcalSetupViewModel,
-                onBack = { screen = Screen.ShoppingList },
+                onBack = {
+                    screen = Screen.ShoppingList
+                    // Pick up any aisle order/name changes made in settings.
+                    shoppingListViewModel.refresh()
+                },
+                onManageAisles = {
+                    aisleSettingsViewModel.refresh()
+                    screen = Screen.AisleSettings
+                },
+            )
+
+            Screen.AisleSettings -> AisleSettingsScreen(
+                viewModel = aisleSettingsViewModel,
+                onBack = { screen = Screen.LokcalSetup },
             )
         }
 

@@ -1,0 +1,21 @@
+-- Maps a food to a supermarket aisle. Keyed by the normalized item name (lowercased, trimmed,
+-- whitespace-collapsed — see FoodLabelRepository.normalizeKey) rather than a shopping-list row id,
+-- so one label covers both Lokcal catalog items and free-typed manual items (whose synthetic row id
+-- churns on every add) and sticks across future shops.
+CREATE TABLE FoodLabel (
+    food_key TEXT PRIMARY KEY,
+    aisle_id INTEGER NOT NULL
+);
+
+selectAll:
+SELECT * FROM FoodLabel;
+
+upsert:
+INSERT OR REPLACE INTO FoodLabel(food_key, aisle_id) VALUES (?, ?);
+
+deleteByKey:
+DELETE FROM FoodLabel WHERE food_key = ?;
+
+-- Drops every label pointing at an aisle that's being deleted, so no rows dangle.
+deleteByAisle:
+DELETE FROM FoodLabel WHERE aisle_id = ?;

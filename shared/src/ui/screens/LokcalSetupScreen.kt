@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -37,6 +38,7 @@ import com.emilflach.groceries.viewmodel.LokcalSetupViewModel
 fun LokcalSetupScreen(
     viewModel: LokcalSetupViewModel,
     onBack: () -> Unit,
+    onManageAisles: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -122,6 +124,16 @@ fun LokcalSetupScreen(
                 shape = MaterialTheme.shapes.large,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Import a single .db file instead") }
+
+            OutlinedButton(
+                onClick = onManageAisles,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Outlined.Storefront, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Manage shopping aisles", fontWeight = FontWeight.SemiBold)
+            }
 
             uiState.lastResult?.let { result ->
                 Text(

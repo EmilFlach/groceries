@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.emilflach.groceries.ShoppingListItem
+import com.emilflach.groceries.data.normalizeKey
+import com.emilflach.groceries.ui.components.AislePickerSheet
 import com.emilflach.groceries.ui.components.FoodImage
 import com.emilflach.groceries.ui.components.ShoppingListItemRow
 import com.emilflach.groceries.viewmodel.ShoppingListViewModel
@@ -46,8 +48,20 @@ fun ShoppingListScreen(
     onAddItem: () -> Unit,
 ) {
     val items by viewModel.items.collectAsState()
+    val toBuyGroups by viewModel.toBuyGroups.collectAsState()
+    val aisles by viewModel.aisles.collectAsState()
+    val labels by viewModel.labels.collectAsState()
     val toBuyItems = items.filter { it.checked_at == null }
     val checkedItems = items.filter { it.checked_at != null }
+
+    val aisleNameById = remember(aisles) { aisles.associate { it.id to it.name } }
+    fun aisleIdFor(item: ShoppingListItem): Long? = labels[normalizeKey(item.name)]
+    fun aisleNameFor(item: ShoppingListItem): String? = aisleIdFor(item)?.let { aisleNameById[it] }
+
+    // Once anything is labeled, break "to buy" into aisle sections; before that it's a plain list.
+    val showAisleHeaders = toBuyGroups.any { it.aisleId != null }
+
+    var labelingItem by remember { mutableStateOf<ShoppingListItem?>(null) }
 
     // Prefer the catalog feed; fall back to the list items' own photos when there's no snapshot.
     val collageUrls = remember(collageImageUrls, items) {
@@ -144,13 +158,25 @@ fun ShoppingListScreen(
                                 modifier = Modifier.animateItem().padding(horizontal = 16.dp),
                             )
                         }
-                        items(toBuyItems, key = { it.id }) { item: ShoppingListItem ->
-                            ShoppingListItemRow(
-                                item = item,
-                                onCheckedChange = { checked -> onToggleChecked(item, checked) },
-                                onRemove = { viewModel.remove(item.id) },
-                                modifier = Modifier.animateItem().padding(horizontal = 16.dp),
-                            )
+                        for (group in toBuyGroups) {
+                            if (showAisleHeaders) {
+                                item(key = "aisle-${group.aisleId ?: "other"}") {
+                                    AisleHeader(
+                                        title = group.title,
+                                        modifier = Modifier.animateItem().padding(horizontal = 16.dp),
+                                    )
+                                }
+                            }
+                            items(group.items, key = { it.id }) { item: ShoppingListItem ->
+                                ShoppingListItemRow(
+                                    item = item,
+                                    onCheckedChange = { checked -> onToggleChecked(item, checked) },
+                                    onRemove = { viewModel.remove(item.id) },
+                                    currentAisleName = aisleNameFor(item),
+                                    onAssignLabel = { labelingItem = item },
+                                    modifier = Modifier.animateItem().padding(horizontal = 16.dp),
+                                )
+                            }
                         }
                     }
 
@@ -169,6 +195,8 @@ fun ShoppingListScreen(
                                 item = item,
                                 onCheckedChange = { checked -> onToggleChecked(item, checked) },
                                 onRemove = { viewModel.remove(item.id) },
+                                currentAisleName = aisleNameFor(item),
+                                onAssignLabel = { labelingItem = item },
                                 modifier = Modifier.animateItem().padding(horizontal = 16.dp),
                             )
                         }
@@ -177,6 +205,35 @@ fun ShoppingListScreen(
             }
         }
     }
+
+    labelingItem?.let { item ->
+        AislePickerSheet(
+            itemName = item.name,
+            aisles = aisles,
+            selectedAisleId = aisleIdFor(item),
+            onSelect = { aisleId ->
+                viewModel.setLabel(item, aisleId)
+                labelingItem = null
+            },
+            onClear = {
+                viewModel.clearLabel(item)
+                labelingItem = null
+            },
+            onDismiss = { labelingItem = null },
+        )
+    }
+}
+
+/** Compact sub-header naming a supermarket aisle within the "to buy" list. */
+@Composable
+private fun AisleHeader(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
+    )
 }
 
 private fun countLabel(toBuy: Int, total: Int): String = when {

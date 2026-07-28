@@ -12,7 +12,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +36,8 @@ fun ShoppingListItemRow(
     onCheckedChange: (Boolean) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
+    currentAisleName: String? = null,
+    onAssignLabel: (() -> Unit)? = null,
 ) {
     val checked = item.checked_at != null
     Surface(
@@ -86,6 +90,18 @@ fun ShoppingListItemRow(
                 color = if (checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
+
+            if (onAssignLabel != null) {
+                val labeled = currentAisleName != null
+                IconButton(onClick = onAssignLabel, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        if (labeled) Icons.Filled.LocalOffer else Icons.Outlined.LocalOffer,
+                        contentDescription = if (labeled) "Aisle: $currentAisleName" else "Assign aisle to ${item.name}",
+                        tint = if (labeled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
 
             IconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
                 Icon(

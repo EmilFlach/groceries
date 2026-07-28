@@ -1,0 +1,31 @@
+-- Supermarket sections in the order you walk the store (ascending sort_order = earlier aisle).
+-- Fruit & Vegetables is seeded at sort_order 0 so it lands at the top of the "to buy" list.
+CREATE TABLE Aisle (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL
+);
+
+selectAllOrdered:
+SELECT * FROM Aisle ORDER BY sort_order, name;
+
+-- Idempotent seed of the default aisles with fixed ids, run at startup. OR IGNORE keeps any user
+-- renames/reorders intact across restarts (the row already exists, so the seed is a no-op).
+insertDefaultAisle:
+INSERT OR IGNORE INTO Aisle(id, name, sort_order) VALUES (?, ?, ?);
+
+-- User-added aisle: id auto-assigned (INTEGER PRIMARY KEY = rowid), placed after the last one.
+insertAisle:
+INSERT INTO Aisle(name, sort_order) VALUES (?, ?);
+
+selectMaxSortOrder:
+SELECT MAX(sort_order) FROM Aisle;
+
+updateName:
+UPDATE Aisle SET name = ? WHERE id = ?;
+
+updateSortOrder:
+UPDATE Aisle SET sort_order = ? WHERE id = ?;
+
+deleteAisle:
+DELETE FROM Aisle WHERE id = ?;
