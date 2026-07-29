@@ -170,6 +170,28 @@ class ShoppingListRepositoryTest {
     }
 
     @Test
+    fun testClearCheckedRemovesOnlyCheckedItems() = runTest {
+        val milk = repository.add(1L, "Milk", null) as AddItemResult.Added
+        repository.add(2L, "Eggs", null)
+        repository.setChecked(milk.id, true)
+
+        repository.clearChecked()
+
+        // Only the checked "Milk" is gone; the active "Eggs" remains.
+        val all = repository.getAll()
+        assertEquals(1, all.size)
+        assertEquals("Eggs", all[0].name)
+        assertNull(all[0].checked_at)
+    }
+
+    @Test
+    fun testClearCheckedNoOpWhenNothingChecked() = runTest {
+        repository.add(1L, "Milk", null)
+        repository.clearChecked()
+        assertEquals(1, repository.getAll().size)
+    }
+
+    @Test
     fun testReAddAfterChecked() = runTest {
         val first = repository.add(1L, "Milk", null) as AddItemResult.Added
         repository.setChecked(first.id, true)

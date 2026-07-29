@@ -1,0 +1,24 @@
+-- Foods the user manually marked as a weekly/regular buy. Keyed by the normalized item name
+-- (lowercased, trimmed, whitespace-collapsed — see FoodLabelRepository.normalizeKey), the same
+-- identity FoodLabel uses, so a mark covers both Lokcal catalog items and free-typed manual items
+-- and sticks across future shops. These merge with foods auto-inferred from Lokcal's Intake log
+-- (see WeeklyRegularSource) into the "Weekly regulars" suggestion group.
+CREATE TABLE RegularItem (
+    food_key TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    image_url TEXT,
+    lokcal_food_id INTEGER,             -- set when marked from a catalog food; NULL for free-typed
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+selectAll:
+SELECT * FROM RegularItem ORDER BY name;
+
+selectByKey:
+SELECT * FROM RegularItem WHERE food_key = ?;
+
+upsert:
+INSERT OR REPLACE INTO RegularItem(food_key, name, image_url, lokcal_food_id) VALUES (?, ?, ?, ?);
+
+deleteByKey:
+DELETE FROM RegularItem WHERE food_key = ?;

@@ -12,4 +12,11 @@ expect class LokcalCatalogReader {
 
     /** Image URLs of meals that have a photo (newest first) — the collage prefers these over food photos. */
     suspend fun browseMealImages(limit: Int = 100): List<String>
+
+    /**
+     * Foods eaten across at least [minWeeks] distinct calendar weeks within the last [windowDays]
+     * — the "regularly bought" signal for weekly-regular recommendations. Most-weeks-first, capped
+     * at [limit]. Empty on platforms without a Lokcal snapshot (iOS/wasm).
+     */
+    suspend fun frequentFoods(windowDays: Int = 84, minWeeks: Int = 3, limit: Int = 40): List<LokcalFrequentFood>
 }

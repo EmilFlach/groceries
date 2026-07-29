@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.Tune
@@ -62,6 +63,7 @@ fun ShoppingListScreen(
     val showAisleHeaders = toBuyGroups.any { it.aisleId != null }
 
     var labelingItem by remember { mutableStateOf<ShoppingListItem?>(null) }
+    var showClearCartConfirm by remember { mutableStateOf(false) }
 
     // Prefer the catalog feed; fall back to the list items' own photos when there's no snapshot.
     val collageUrls = remember(collageImageUrls, items) {
@@ -187,6 +189,9 @@ fun ShoppingListScreen(
                                 actionLabel = "Uncheck all",
                                 actionIcon = Icons.AutoMirrored.Outlined.Undo,
                                 onAction = viewModel::uncheckAll,
+                                secondaryActionLabel = "Clear",
+                                secondaryActionIcon = Icons.Outlined.DeleteSweep,
+                                onSecondaryAction = { showClearCartConfirm = true },
                                 modifier = Modifier.animateItem().padding(horizontal = 16.dp),
                             )
                         }
@@ -222,6 +227,31 @@ fun ShoppingListScreen(
             onDismiss = { labelingItem = null },
         )
     }
+
+    if (showClearCartConfirm) {
+        val count = checkedItems.size
+        AlertDialog(
+            onDismissRequest = { showClearCartConfirm = false },
+            title = { Text("Clear the cart?") },
+            text = {
+                Text(
+                    "This permanently removes the $count checked item${if (count == 1) "" else "s"} " +
+                        "so you can start a fresh list. This can't be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.clearChecked()
+                    showClearCartConfirm = false
+                }) {
+                    Text("Clear", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCartConfirm = false }) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 /** Compact sub-header naming a supermarket aisle within the "to buy" list. */
@@ -242,7 +272,7 @@ private fun countLabel(toBuy: Int, total: Int): String = when {
     else -> "$toBuy to buy" + (if (total - toBuy > 0) " · ${total - toBuy} in the cart" else "")
 }
 
-/** Divider row above a section (to-buy / in-the-cart) with a one-tap bulk action for that section. */
+/** Divider row above a section (to-buy / in-the-cart) with one or two one-tap bulk actions. */
 @Composable
 private fun SectionHeader(
     title: String,
@@ -250,6 +280,9 @@ private fun SectionHeader(
     actionIcon: ImageVector,
     onAction: () -> Unit,
     modifier: Modifier = Modifier,
+    secondaryActionLabel: String? = null,
+    secondaryActionIcon: ImageVector? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -262,6 +295,13 @@ private fun SectionHeader(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
+        if (secondaryActionLabel != null && secondaryActionIcon != null && onSecondaryAction != null) {
+            TextButton(onClick = onSecondaryAction, contentPadding = PaddingValues(horizontal = 12.dp)) {
+                Icon(secondaryActionIcon, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(secondaryActionLabel)
+            }
+        }
         TextButton(onClick = onAction, contentPadding = PaddingValues(horizontal = 12.dp)) {
             Icon(
                 actionIcon,

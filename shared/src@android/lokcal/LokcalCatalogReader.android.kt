@@ -29,6 +29,9 @@ actual class LokcalCatalogReader(private val context: Context) {
     actual suspend fun browseMealImages(limit: Int): List<String> =
         read(emptyList()) { it.mealImages(limit) }
 
+    actual suspend fun frequentFoods(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentFood> =
+        read(emptyList()) { it.regularFoods(windowDays, minWeeks, limit) }
+
     /** Runs [block] against the cached read-only snapshot — off the main thread and one at a time. */
     private suspend fun <T> read(default: T, block: suspend (LokcalSnapshotQueries) -> T): T =
         withContext(Dispatchers.IO) {
@@ -76,22 +79,37 @@ private class AndroidLokcalQueries(private val db: SQLiteDatabase) : LokcalSnaps
             out
         }
 
+    override suspend fun regularFoods(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentFood> =
+        db.rawQuery(
+            LokcalSearchSql.REGULAR_FOODS,
+            arrayOf(windowDays.toString(), minWeeks.toString(), limit.toString()),
+        ).use { it.readFrequentFoods() }
+
     private fun query(sql: String, args: Array<String>?): List<LokcalFood> =
         db.rawQuery(sql, args).use { it.readFoods() }
 
     private fun Cursor.readFoods(): List<LokcalFood> {
         val out = ArrayList<LokcalFood>(count)
+        while (moveToNext()) out += readFood()
+        return out
+    }
+
+    private fun Cursor.readFrequentFoods(): List<LokcalFrequentFood> {
+        val out = ArrayList<LokcalFrequentFood>(count)
         while (moveToNext()) {
-            out += LokcalFood(
-                id = getLong(0),
-                name = getString(1),
-                energyKcalPer100g = getDouble(2),
-                gtin13 = getString(3),
-                imageUrl = getString(4),
-                productUrl = getString(5),
-                source = getString(6),
-            )
+            // Columns 0..6 are the food (COLS_F); 7 = distinct weeks, 8 = last eaten.
+            out += LokcalFrequentFood(readFood(), distinctWeeks = getInt(7), lastEaten = getString(8))
         }
         return out
     }
+
+    private fun Cursor.readFood() = LokcalFood(
+        id = getLong(0),
+        name = getString(1),
+        energyKcalPer100g = getDouble(2),
+        gtin13 = getString(3),
+        imageUrl = getString(4),
+        productUrl = getString(5),
+        source = getString(6),
+    )
 }

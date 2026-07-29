@@ -26,6 +26,13 @@ internal interface LokcalSnapshotQueries {
 
     /** Image URLs of meals that carry a photo, newest first, capped at [limit]. */
     suspend fun mealImages(limit: Int): List<String>
+
+    /**
+     * Foods logged in Intake as a FOOD source within the last [windowDays], grouped by food and
+     * kept only if they appear in at least [minWeeks] distinct calendar weeks — the "regularly
+     * bought" signal. Ordered most-weeks-first, capped at [limit].
+     */
+    suspend fun regularFoods(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentFood>
 }
 
 /** SQL shared by the Android (`SQLiteDatabase`) and JVM (JDBC) actuals — both plain SQLite. */
@@ -48,6 +55,20 @@ internal object LokcalSearchSql {
 
     const val BROWSE =
         "SELECT $COLS_F FROM Food f $TRACK_JOIN ORDER BY COALESCE(tc.track_count, 0) DESC, f.name LIMIT ?"
+
+    // Foods eaten across many recent weeks = the "regularly bought" signal. strftime('%Y-%W', …)
+    // buckets each intake by year + week-of-year (avoiding %G/%V, which older SQLite lacks) so two
+    // logs in the same week count once. date('now','-N days') bounds the window.
+    // Params, in order: windowDays, minWeeks, limit.
+    const val REGULAR_FOODS =
+        "SELECT $COLS_F, " +
+            "COUNT(DISTINCT strftime('%Y-%W', i.timestamp)) AS weeks, MAX(i.timestamp) AS last_eaten " +
+            "FROM Intake i JOIN Food f ON f.id = i.source_food_id " +
+            "WHERE i.source_type = 'FOOD' AND i.source_food_id IS NOT NULL " +
+            "AND i.timestamp >= date('now', '-' || ? || ' days') " +
+            "GROUP BY i.source_food_id " +
+            "HAVING weeks >= ? " +
+            "ORDER BY weeks DESC, last_eaten DESC LIMIT ?"
 
     // Params, in order: like, like, qLower, qLower, limit.
     const val SEARCH_RANKED =

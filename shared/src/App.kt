@@ -13,13 +13,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.emilflach.groceries.data.FoodLabelRepository
+import com.emilflach.groceries.data.RegularItemRepository
 import com.emilflach.groceries.data.ShoppingListRepository
 import com.emilflach.groceries.data.SqlDriverFactory
 import com.emilflach.groceries.data.createDatabase
 import com.emilflach.groceries.lokcal.LokcalCatalogReader
-import com.emilflach.groceries.lokcal.LokcalFood
 import com.emilflach.groceries.lokcal.LokcalImportRepository
-import com.emilflach.groceries.ui.screens.AddItemScreen
+import com.emilflach.groceries.recommendations.RecommendationRepository
+import com.emilflach.groceries.recommendations.WeeklyRegularSource
+import com.emilflach.groceries.ui.screens.AddHubScreen
 import com.emilflach.groceries.ui.screens.AisleSettingsScreen
 import com.emilflach.groceries.ui.screens.LokcalSetupScreen
 import com.emilflach.groceries.ui.screens.ShoppingListScreen
@@ -28,6 +30,8 @@ import com.emilflach.groceries.ui.util.ConfigureCoilImageLoader
 import com.emilflach.groceries.viewmodel.AisleSettingsViewModel
 import com.emilflach.groceries.viewmodel.LokcalSetupViewModel
 import com.emilflach.groceries.viewmodel.ShoppingListViewModel
+import com.emilflach.groceries.viewmodel.SuggestionsViewModel
+import androidx.compose.runtime.collectAsState
 
 private enum class Screen { ShoppingList, LokcalSetup, AisleSettings }
 
@@ -53,8 +57,17 @@ fun App(
 
         val shoppingListRepository = remember(db) { ShoppingListRepository(db) }
         val foodLabelRepository = remember(db) { FoodLabelRepository(db) }
+        val regularItemRepository = remember(db) { RegularItemRepository(db) }
         val shoppingListViewModel = remember(shoppingListRepository, foodLabelRepository) {
             ShoppingListViewModel(shoppingListRepository, foodLabelRepository)
+        }
+        val suggestionsViewModel = remember(db, lokcalCatalogReader, shoppingListViewModel) {
+            val recommendations = RecommendationRepository(
+                sources = listOf(
+                    WeeklyRegularSource(lokcalCatalogReader::frequentFoods, regularItemRepository),
+                ),
+            )
+            SuggestionsViewModel(recommendations, regularItemRepository, shoppingListViewModel)
         }
 
         // Seed the default supermarket aisles once, then reload so grouping picks them up.
@@ -84,18 +97,16 @@ fun App(
             }.getOrDefault(emptyList())
         }
 
-        // Warm the picker's initial browse list at startup so opening "Add food" renders instantly.
-        val initialFoods by produceState(emptyList<LokcalFood>(), lokcalCatalogReader, hasSnapshot) {
-            value = runCatching { lokcalCatalogReader.browseFoods() }.getOrDefault(emptyList())
-        }
-
         when (screen) {
             Screen.ShoppingList -> ShoppingListScreen(
                 viewModel = shoppingListViewModel,
                 hasSnapshot = hasSnapshot,
                 collageImageUrls = collageImageUrls,
                 onOpenSetup = { screen = Screen.LokcalSetup },
-                onAddItem = { showAddItem = true },
+                onAddItem = {
+                    suggestionsViewModel.refresh()
+                    showAddItem = true
+                },
             )
 
             Screen.LokcalSetup -> LokcalSetupScreen(
@@ -118,9 +129,12 @@ fun App(
         }
 
         if (showAddItem) {
-            AddItemScreen(
+            val groups by suggestionsViewModel.groups.collectAsState()
+            val regularKeys by suggestionsViewModel.regularKeys.collectAsState()
+            AddHubScreen(
                 catalogReader = lokcalCatalogReader,
-                initialFoods = initialFoods,
+                groups = groups,
+                regularKeys = regularKeys,
                 onDismiss = { showAddItem = false },
                 onFoodSelected = { food ->
                     shoppingListViewModel.addItem(food.id, food.name, food.imageUrl)
@@ -128,6 +142,9 @@ fun App(
                 onAddCustom = { name ->
                     shoppingListViewModel.addManualItem(name)
                 },
+                onToggleSuggestion = { suggestionsViewModel.toggle(it) },
+                onAddAll = { suggestionsViewModel.addAll(it) },
+                onToggleRegular = { suggestionsViewModel.markRegular(it) },
             )
         }
     }

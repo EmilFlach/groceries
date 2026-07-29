@@ -5,4 +5,5 @@ actual class LokcalCatalogReader {
     actual suspend fun browseFoods(limit: Int): List<LokcalFood> = emptyList()
     actual suspend fun searchFoods(query: String): List<LokcalFood> = emptyList()
     actual suspend fun browseMealImages(limit: Int): List<String> = emptyList()
+    actual suspend fun frequentFoods(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentFood> = emptyList()
 }

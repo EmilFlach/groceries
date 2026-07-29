@@ -62,4 +62,9 @@ class ShoppingListRepository(database: Database) {
     suspend fun remove(id: Long) {
         queries.deleteById(id)
     }
+
+    /** Permanently removes every checked ("in the cart") item — for starting a fresh weekly list. */
+    suspend fun clearChecked() {
+        queries.deleteChecked()
+    }
 }

@@ -106,6 +106,14 @@ class ShoppingListViewModel(
         }
     }
 
+    /** Deletes every checked ("in the cart") item — clears the cart to start a fresh weekly list. */
+    fun clearChecked() {
+        viewModelScope.launch {
+            repository.clearChecked()
+            refresh()
+        }
+    }
+
     /** Assigns [item] (and every other item sharing its normalized name) to the given aisle. */
     fun setLabel(item: ShoppingListItem, aisleId: Long) {
         viewModelScope.launch {

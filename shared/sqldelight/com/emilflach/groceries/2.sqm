@@ -1,0 +1,9 @@
+-- Adds the manual "weekly regulars" table. Fresh installs get it straight from the .sq CREATE
+-- statement; this migration brings existing databases (schema v2) up to v3.
+CREATE TABLE RegularItem (
+    food_key TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    image_url TEXT,
+    lokcal_food_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

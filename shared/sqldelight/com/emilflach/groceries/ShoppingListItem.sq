@@ -51,3 +51,7 @@ WHERE id IN (
 
 deleteById:
 DELETE FROM ShoppingListItem WHERE id = ?;
+
+-- Clears the "in the cart" section in one go — used to start a fresh list for the week.
+deleteChecked:
+DELETE FROM ShoppingListItem WHERE checked_at IS NOT NULL;

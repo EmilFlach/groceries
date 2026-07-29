@@ -13,3 +13,16 @@ data class LokcalFood(
     val productUrl: String?,
     val source: String?,
 )
+
+/**
+ * A [LokcalFood] the user consumed across several recent weeks in Lokcal's Intake log —
+ * the raw signal behind "weekly regulars" recommendations.
+ *
+ * @param distinctWeeks how many distinct calendar weeks (within the query window) it appeared in
+ * @param lastEaten the most recent Intake timestamp for it (raw text, newest first ordering only)
+ */
+data class LokcalFrequentFood(
+    val food: LokcalFood,
+    val distinctWeeks: Int,
+    val lastEaten: String?,
+)

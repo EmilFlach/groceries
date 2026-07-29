@@ -31,6 +31,9 @@ actual class LokcalCatalogReader {
     actual suspend fun browseMealImages(limit: Int): List<String> =
         read(emptyList()) { it.mealImages(limit) }
 
+    actual suspend fun frequentFoods(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentFood> =
+        read(emptyList()) { it.regularFoods(windowDays, minWeeks, limit) }
+
     /** Runs [block] against the cached read-only snapshot — off the main thread and one at a time. */
     private suspend fun <T> read(default: T, block: suspend (LokcalSnapshotQueries) -> T): T =
         withContext(Dispatchers.IO) {
@@ -90,6 +93,15 @@ internal class JdbcLokcalQueries(private val connection: Connection) : LokcalSna
             }
         }
 
+    @Suppress("SqlSourceToSinkFlow")
+    override suspend fun regularFoods(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentFood> =
+        connection.prepareStatement(LokcalSearchSql.REGULAR_FOODS).use { statement ->
+            statement.setInt(1, windowDays)
+            statement.setInt(2, minWeeks)
+            statement.setInt(3, limit)
+            statement.executeQuery().use { it.readFrequentFoods() }
+        }
+
     private fun query(sql: String, args: List<Any>): List<LokcalFood> =
         connection.prepareStatement(sql).use { statement ->
             args.forEachIndexed { i, arg ->
@@ -104,17 +116,24 @@ internal class JdbcLokcalQueries(private val connection: Connection) : LokcalSna
 
     private fun ResultSet.readFoods(): List<LokcalFood> {
         val out = ArrayList<LokcalFood>()
-        while (next()) {
-            out += LokcalFood(
-                id = getLong(1),
-                name = getString(2),
-                energyKcalPer100g = getDouble(3),
-                gtin13 = getString(4),
-                imageUrl = getString(5),
-                productUrl = getString(6),
-                source = getString(7),
-            )
-        }
+        while (next()) out += readFood()
         return out
     }
+
+    private fun ResultSet.readFrequentFoods(): List<LokcalFrequentFood> {
+        val out = ArrayList<LokcalFrequentFood>()
+        // JDBC is 1-indexed: columns 1..7 are the food (COLS_F); 8 = distinct weeks, 9 = last eaten.
+        while (next()) out += LokcalFrequentFood(readFood(), distinctWeeks = getInt(8), lastEaten = getString(9))
+        return out
+    }
+
+    private fun ResultSet.readFood() = LokcalFood(
+        id = getLong(1),
+        name = getString(2),
+        energyKcalPer100g = getDouble(3),
+        gtin13 = getString(4),
+        imageUrl = getString(5),
+        productUrl = getString(6),
+        source = getString(7),
+    )
 }
