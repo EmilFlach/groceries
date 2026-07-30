@@ -26,10 +26,10 @@ class RegularItemRepositoryTest {
     fun teardown() = driver.close()
 
     @Test
-    fun schemaIncludesRegularItemAtVersion3() {
-        // Guards that RegularItem.sq + 2.sqm are wired in: fresh create must have the table (the
-        // selectAll in the round-trip below would throw otherwise) and bump the schema version.
-        assertEquals(3L, Database.Schema.version)
+    fun schemaIsAtLatestVersion() {
+        // Bumps as migrations are added: v1 base, +1.sqm (aisles), +2.sqm (RegularItem),
+        // +3.sqm (DismissedSuggestion) = 4. Guards that new .sq tables are wired with a migration.
+        assertEquals(4L, Database.Schema.version)
     }
 
     @Test

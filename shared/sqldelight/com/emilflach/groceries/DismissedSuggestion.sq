@@ -1,0 +1,19 @@
+-- Foods/meals the user dismissed ("Not interested") from auto recommendations, so they stop showing
+-- in the "Suggested" group and in meal groups. Foods are keyed by normalizeKey(food name); meals by
+-- normalizeKey(meal name) — the [kind] column separates the two namespaces. Manual "Weekly regulars"
+-- are never affected. Read back by SuggestionsViewModel via DismissedSuggestionRepository.
+CREATE TABLE DismissedSuggestion (
+    kind TEXT NOT NULL,       -- 'FOOD' or 'MEAL'
+    item_key TEXT NOT NULL,   -- normalizeKey of the food name / meal name
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (kind, item_key)
+);
+
+selectAll:
+SELECT * FROM DismissedSuggestion;
+
+upsert:
+INSERT OR REPLACE INTO DismissedSuggestion(kind, item_key) VALUES (?, ?);
+
+deleteByKey:
+DELETE FROM DismissedSuggestion WHERE kind = ? AND item_key = ?;

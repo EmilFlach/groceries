@@ -33,6 +33,17 @@ internal interface LokcalSnapshotQueries {
      * bought" signal. Ordered most-weeks-first, capped at [limit].
      */
     suspend fun regularFoods(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentFood>
+
+    /**
+     * Meals logged in Intake as a MEAL source within the last [windowDays], grouped by meal and kept
+     * only if they appear in at least [minWeeks] distinct calendar weeks — the "cooked regularly"
+     * signal. Ordered most-weeks-first, capped at [limit]. The meals themselves; ingredient foods are
+     * fetched per meal via [mealItems].
+     */
+    suspend fun regularMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal>
+
+    /** The ingredient foods of a meal, in the meal's own item order. */
+    suspend fun mealItems(mealId: Long): List<LokcalFood>
 }
 
 /** SQL shared by the Android (`SQLiteDatabase`) and JVM (JDBC) actuals — both plain SQLite. */
@@ -67,8 +78,33 @@ internal object LokcalSearchSql {
             "WHERE i.source_type = 'FOOD' AND i.source_food_id IS NOT NULL " +
             "AND i.timestamp >= date('now', '-' || ? || ' days') " +
             "GROUP BY i.source_food_id " +
-            "HAVING weeks >= ? " +
+            // CAST so the threshold works whether the driver binds this param as INTEGER (JDBC's
+            // setInt) or TEXT (Android's rawQuery binds every arg as text): comparing the INTEGER
+            // week count against a TEXT value is always false in SQLite, silently returning nothing.
+            "HAVING weeks >= CAST(? AS INTEGER) " +
             "ORDER BY weeks DESC, last_eaten DESC LIMIT ?"
+
+    // Meals cooked across many recent weeks = the "cooked regularly" signal, the meal-level twin of
+    // REGULAR_FOODS (same %Y-%W week bucketing and window bound, over MEAL-source intakes).
+    // Params, in order: windowDays, minWeeks, limit.
+    private const val MEAL_COLS = "m.id, m.name, m.image_url"
+    const val REGULAR_MEALS =
+        "SELECT $MEAL_COLS, " +
+            "COUNT(DISTINCT strftime('%Y-%W', i.timestamp)) AS weeks, MAX(i.timestamp) AS last_eaten " +
+            "FROM Intake i JOIN Meal m ON m.id = i.source_meal_id " +
+            "WHERE i.source_type = 'MEAL' AND i.source_meal_id IS NOT NULL " +
+            "AND i.timestamp >= date('now', '-' || ? || ' days') " +
+            "GROUP BY i.source_meal_id " +
+            // CAST so the threshold works whether the driver binds this param as INTEGER (JDBC's
+            // setInt) or TEXT (Android's rawQuery binds every arg as text): comparing the INTEGER
+            // week count against a TEXT value is always false in SQLite, silently returning nothing.
+            "HAVING weeks >= CAST(? AS INTEGER) " +
+            "ORDER BY weeks DESC, last_eaten DESC LIMIT ?"
+
+    // A meal's ingredient foods, in the meal's own item order. Params: mealId.
+    const val MEAL_ITEMS =
+        "SELECT $COLS_F FROM MealItem mi JOIN Food f ON f.id = mi.food_id " +
+            "WHERE mi.meal_id = ? ORDER BY mi.id"
 
     // Params, in order: like, like, qLower, qLower, limit.
     const val SEARCH_RANKED =

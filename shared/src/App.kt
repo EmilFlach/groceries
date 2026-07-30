@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.emilflach.groceries.data.DismissedSuggestionRepository
 import com.emilflach.groceries.data.FoodLabelRepository
 import com.emilflach.groceries.data.RegularItemRepository
 import com.emilflach.groceries.data.ShoppingListRepository
@@ -19,7 +20,11 @@ import com.emilflach.groceries.data.SqlDriverFactory
 import com.emilflach.groceries.data.createDatabase
 import com.emilflach.groceries.lokcal.LokcalCatalogReader
 import com.emilflach.groceries.lokcal.LokcalImportRepository
+import com.emilflach.groceries.lokcal.LokcalFood
+import com.emilflach.groceries.lokcal.LokcalFrequentMeal
+import com.emilflach.groceries.recommendations.FrequentMealProvider
 import com.emilflach.groceries.recommendations.RecommendationRepository
+import com.emilflach.groceries.recommendations.RegularMealSource
 import com.emilflach.groceries.recommendations.WeeklyRegularSource
 import com.emilflach.groceries.ui.screens.AddHubScreen
 import com.emilflach.groceries.ui.screens.AisleSettingsScreen
@@ -58,16 +63,29 @@ fun App(
         val shoppingListRepository = remember(db) { ShoppingListRepository(db) }
         val foodLabelRepository = remember(db) { FoodLabelRepository(db) }
         val regularItemRepository = remember(db) { RegularItemRepository(db) }
+        val dismissedSuggestionRepository = remember(db) { DismissedSuggestionRepository(db) }
         val shoppingListViewModel = remember(shoppingListRepository, foodLabelRepository) {
             ShoppingListViewModel(shoppingListRepository, foodLabelRepository)
         }
         val suggestionsViewModel = remember(db, lokcalCatalogReader, shoppingListViewModel) {
+            // Adapter over the reader's two meal calls (a fun-interface method reference can't carry
+            // both), so [RegularMealSource] stays reader-agnostic and unit-testable with a fake.
+            val mealProvider = object : FrequentMealProvider {
+                override suspend fun frequentMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal> =
+                    lokcalCatalogReader.frequentMeals(windowDays, minWeeks, limit)
+
+                override suspend fun mealItems(mealId: Long): List<LokcalFood> =
+                    lokcalCatalogReader.mealItems(mealId)
+            }
             val recommendations = RecommendationRepository(
+                // Weekly regulars first so a food that's both a regular and a meal ingredient stays
+                // under regulars (see RecommendationRepository's earlier-source-wins dedup).
                 sources = listOf(
                     WeeklyRegularSource(lokcalCatalogReader::frequentFoods, regularItemRepository),
+                    RegularMealSource(mealProvider),
                 ),
             )
-            SuggestionsViewModel(recommendations, regularItemRepository, shoppingListViewModel)
+            SuggestionsViewModel(recommendations, regularItemRepository, dismissedSuggestionRepository, shoppingListViewModel)
         }
 
         // Seed the default supermarket aisles once, then reload so grouping picks them up.
@@ -131,10 +149,12 @@ fun App(
         if (showAddItem) {
             val groups by suggestionsViewModel.groups.collectAsState()
             val regularKeys by suggestionsViewModel.regularKeys.collectAsState()
+            val aisleNames by suggestionsViewModel.aisleNames.collectAsState()
             AddHubScreen(
                 catalogReader = lokcalCatalogReader,
                 groups = groups,
                 regularKeys = regularKeys,
+                aisleNames = aisleNames,
                 onDismiss = { showAddItem = false },
                 onFoodSelected = { food ->
                     shoppingListViewModel.addItem(food.id, food.name, food.imageUrl)
@@ -145,6 +165,10 @@ fun App(
                 onToggleSuggestion = { suggestionsViewModel.toggle(it) },
                 onAddAll = { suggestionsViewModel.addAll(it) },
                 onToggleRegular = { suggestionsViewModel.markRegular(it) },
+                onDismissMeal = { suggestionsViewModel.dismissMeal(it) },
+                onRestoreMeal = { suggestionsViewModel.restoreMeal(it) },
+                onDismissSuggestion = { suggestionsViewModel.dismiss(it) },
+                onRestoreSuggestion = { suggestionsViewModel.restore(it) },
             )
         }
     }

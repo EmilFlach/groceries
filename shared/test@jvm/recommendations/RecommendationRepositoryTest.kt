@@ -28,7 +28,9 @@ class RecommendationRepositoryTest {
     }
 
     @Test
-    fun laterSourceLosesSharedKey() = runTest {
+    fun keepsSharedKeyAcrossGroups() = runTest {
+        // No cross-group dedup: a food may appear in several groups (an ingredient shared by meals,
+        // or a food that's both a suggestion and an ingredient) so each group stays complete.
         val repo = RecommendationRepository(
             listOf(
                 source("a", SuggestionGroup("a", "A", listOf(suggestion("milk")), true)),
@@ -37,7 +39,7 @@ class RecommendationRepositoryTest {
         )
         val groups = repo.load()
         assertEquals(listOf("milk"), groups[0].suggestions.map { it.key })
-        assertEquals(listOf("eggs"), groups[1].suggestions.map { it.key }, "milk already surfaced by source a")
+        assertEquals(listOf("milk", "eggs"), groups[1].suggestions.map { it.key }, "milk repeats — groups don't dedup against each other")
     }
 
     @Test

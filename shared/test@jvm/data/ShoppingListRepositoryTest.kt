@@ -203,4 +203,22 @@ class ShoppingListRepositoryTest {
         val all = repository.getAll()
         assertEquals(2, all.size)
     }
+
+    @Test
+    fun testUncheckDropsRedundantRowWhenFoodAlreadyActive() = runTest {
+        // Reproduces the crash: a food that's both checked and active (e.g. re-added from the "Add"
+        // screen while still in the cart). Unchecking the checked row must not create a second
+        // active row — the active-food unique index would reject it — so the redundant row is
+        // dropped instead. Previously this threw a constraint violation and crashed the app.
+        val checked = repository.add(1L, "Milk", null) as AddItemResult.Added
+        repository.setChecked(checked.id, true)
+        val active = repository.add(1L, "Milk", null) as AddItemResult.Added
+
+        repository.setChecked(checked.id, false)
+
+        val all = repository.getAll()
+        assertEquals(1, all.size, "the redundant checked row is dropped, not revived into a duplicate")
+        assertEquals(active.id, all[0].id)
+        assertNull(all[0].checked_at)
+    }
 }

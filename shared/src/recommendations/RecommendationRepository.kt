@@ -1,29 +1,22 @@
 package com.emilflach.groceries.recommendations
 
 /**
- * Aggregates every [RecommendationSource] into the flat list of groups the UI renders.
+ * Aggregates every [RecommendationSource] into the flat list of groups the UI renders, in source
+ * declaration order.
  *
- * Sources run in declaration order, which is also their priority: if two sources surface the same
- * food (by [Suggestion.key]), the earlier source keeps it and later ones drop it, so a food never
- * appears in two groups. A source that throws is skipped (its groups are simply absent) rather than
- * failing the whole load, and empty groups are dropped so the UI never renders a bare header.
- *
- * This is deliberately pure — it only combines source output. Dedup against the *current shopping
- * list* and "already added" marking are view concerns handled in the ViewModel, keeping this
- * trivially unit-testable.
+ * Duplicates are removed only *within* a group (by [Suggestion.key]), never across groups: the same
+ * food may legitimately appear in more than one place — an ingredient shared by several meals, or a
+ * food that's both a suggestion and a meal ingredient — and each group must stand on its own so a
+ * meal shows its complete recipe. The cross-group rules that DO apply ("Suggested" excludes manual
+ * regulars; dismissed items are hidden) live in [WeeklyRegularSource] and the ViewModel, next to the
+ * state they depend on. A source that throws is skipped rather than sinking the whole load, and empty
+ * groups are dropped so the UI never renders a bare header.
  */
 class RecommendationRepository(private val sources: List<RecommendationSource>) {
 
-    suspend fun load(): List<SuggestionGroup> {
-        val seen = HashSet<String>()
-        return sources
+    suspend fun load(): List<SuggestionGroup> =
+        sources
             .flatMap { source -> runCatching { source.load() }.getOrDefault(emptyList()) }
-            .map { group ->
-                val kept = group.suggestions
-                    .distinctBy { it.key }
-                    .filter { seen.add(it.key) }
-                group.copy(suggestions = kept)
-            }
+            .map { group -> group.copy(suggestions = group.suggestions.distinctBy { it.key }) }
             .filter { it.suggestions.isNotEmpty() }
-    }
 }

@@ -1,0 +1,8 @@
+-- Adds the dismissed-suggestion table ("Not interested" foods/meals). Fresh installs get it straight
+-- from the .sq CREATE statement; this migration brings existing databases (schema v3) up to v4.
+CREATE TABLE DismissedSuggestion (
+    kind TEXT NOT NULL,
+    item_key TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (kind, item_key)
+);

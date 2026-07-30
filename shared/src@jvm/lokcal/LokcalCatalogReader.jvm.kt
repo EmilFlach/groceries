@@ -34,6 +34,12 @@ actual class LokcalCatalogReader {
     actual suspend fun frequentFoods(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentFood> =
         read(emptyList()) { it.regularFoods(windowDays, minWeeks, limit) }
 
+    actual suspend fun frequentMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal> =
+        read(emptyList()) { it.regularMeals(windowDays, minWeeks, limit) }
+
+    actual suspend fun mealItems(mealId: Long): List<LokcalFood> =
+        read(emptyList()) { it.mealItems(mealId) }
+
     /** Runs [block] against the cached read-only snapshot — off the main thread and one at a time. */
     private suspend fun <T> read(default: T, block: suspend (LokcalSnapshotQueries) -> T): T =
         withContext(Dispatchers.IO) {
@@ -102,6 +108,22 @@ internal class JdbcLokcalQueries(private val connection: Connection) : LokcalSna
             statement.executeQuery().use { it.readFrequentFoods() }
         }
 
+    @Suppress("SqlSourceToSinkFlow")
+    override suspend fun regularMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal> =
+        connection.prepareStatement(LokcalSearchSql.REGULAR_MEALS).use { statement ->
+            statement.setInt(1, windowDays)
+            statement.setInt(2, minWeeks)
+            statement.setInt(3, limit)
+            statement.executeQuery().use { it.readFrequentMeals() }
+        }
+
+    @Suppress("SqlSourceToSinkFlow")
+    override suspend fun mealItems(mealId: Long): List<LokcalFood> =
+        connection.prepareStatement(LokcalSearchSql.MEAL_ITEMS).use { statement ->
+            statement.setLong(1, mealId)
+            statement.executeQuery().use { it.readFoods() }
+        }
+
     private fun query(sql: String, args: List<Any>): List<LokcalFood> =
         connection.prepareStatement(sql).use { statement ->
             args.forEachIndexed { i, arg ->
@@ -124,6 +146,19 @@ internal class JdbcLokcalQueries(private val connection: Connection) : LokcalSna
         val out = ArrayList<LokcalFrequentFood>()
         // JDBC is 1-indexed: columns 1..7 are the food (COLS_F); 8 = distinct weeks, 9 = last eaten.
         while (next()) out += LokcalFrequentFood(readFood(), distinctWeeks = getInt(8), lastEaten = getString(9))
+        return out
+    }
+
+    private fun ResultSet.readFrequentMeals(): List<LokcalFrequentMeal> {
+        val out = ArrayList<LokcalFrequentMeal>()
+        // JDBC is 1-indexed: 1 = id, 2 = name, 3 = image_url, 4 = distinct weeks, 5 = last eaten.
+        while (next()) {
+            out += LokcalFrequentMeal(
+                LokcalMeal(id = getLong(1), name = getString(2), imageUrl = getString(3)),
+                distinctWeeks = getInt(4),
+                lastEaten = getString(5),
+            )
+        }
         return out
     }
 

@@ -21,13 +21,27 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.AcUnit
+import androidx.compose.material.icons.outlined.BakeryDining
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.CleaningServices
+import androidx.compose.material.icons.outlined.Cookie
 import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material.icons.outlined.Eco
+import androidx.compose.material.icons.outlined.Egg
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.LocalDrink
+import androidx.compose.material.icons.outlined.RiceBowl
+import androidx.compose.material.icons.outlined.SetMeal
 import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -39,12 +53,14 @@ import androidx.compose.ui.unit.dp
 import com.emilflach.groceries.data.normalizeKey
 import com.emilflach.groceries.lokcal.LokcalCatalogReader
 import com.emilflach.groceries.lokcal.LokcalFood
+import com.emilflach.groceries.recommendations.RegularMealSource
 import com.emilflach.groceries.recommendations.Suggestion
 import com.emilflach.groceries.ui.components.FoodImage
 import com.emilflach.groceries.ui.util.PlatformBackHandler
 import com.emilflach.groceries.viewmodel.SuggestionGroupUi
 import com.emilflach.groceries.viewmodel.SuggestionUi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -59,12 +75,17 @@ fun AddHubScreen(
     catalogReader: LokcalCatalogReader,
     groups: List<SuggestionGroupUi>,
     regularKeys: Set<String>,
+    aisleNames: Map<String, String>,
     onDismiss: () -> Unit,
     onFoodSelected: (LokcalFood) -> Unit,
     onAddCustom: (String) -> Unit,
     onToggleSuggestion: (Suggestion) -> Unit,
     onAddAll: (SuggestionGroupUi) -> Unit,
     onToggleRegular: (Suggestion) -> Unit,
+    onDismissMeal: (SuggestionGroupUi) -> Unit,
+    onRestoreMeal: (SuggestionGroupUi) -> Unit,
+    onDismissSuggestion: (Suggestion) -> Unit,
+    onRestoreSuggestion: (Suggestion) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<LokcalFood>>(emptyList()) }
@@ -75,6 +96,29 @@ fun AddHubScreen(
     val focusRequester = remember { FocusRequester() }
     val trimmedQuery = query.trim()
     val searching = trimmedQuery.isNotEmpty()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    // Dismiss now, but offer a brief undo — dismissing is the only way to hide a suggestion, so a
+    // mis-tap shouldn't be irreversible (there's no separate "dismissed" screen to restore from).
+    fun dismissWithUndo(label: String, onUndo: () -> Unit) {
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "Dismissed $label",
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) onUndo()
+        }
+    }
+    val onMealDismissed: (SuggestionGroupUi) -> Unit = { group ->
+        onDismissMeal(group)
+        dismissWithUndo(group.title) { onRestoreMeal(group) }
+    }
+    val onSuggestionDismissed: (Suggestion) -> Unit = { suggestion ->
+        onDismissSuggestion(suggestion)
+        dismissWithUndo(suggestion.name) { onRestoreSuggestion(suggestion) }
+    }
 
     PlatformBackHandler { onDismiss() }
 
@@ -101,6 +145,7 @@ fun AddHubScreen(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+      Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -170,12 +215,23 @@ fun AddHubScreen(
                 Suggestions(
                     groups = groups,
                     regularKeys = regularKeys,
+                    aisleNames = aisleNames,
                     onToggle = onToggleSuggestion,
                     onAddAll = onAddAll,
                     onToggleRegular = onToggleRegular,
+                    onDismissMeal = onMealDismissed,
+                    onDismissSuggestion = onSuggestionDismissed,
                 )
             }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(16.dp),
+        )
+      }
     }
 }
 
@@ -188,6 +244,7 @@ private fun RegularContextMenu(
     isRegular: Boolean,
     onDismiss: () -> Unit,
     onToggle: () -> Unit,
+    onNotInterested: (() -> Unit)? = null,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
@@ -201,6 +258,20 @@ private fun RegularContextMenu(
             },
             onClick = onToggle,
         )
+        // Only offered where dismissing makes sense (auto suggestions, not the user's own regulars).
+        if (onNotInterested != null) {
+            DropdownMenuItem(
+                text = { Text("Not interested") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.VisibilityOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                onClick = onNotInterested,
+            )
+        }
     }
 }
 
@@ -208,9 +279,12 @@ private fun RegularContextMenu(
 private fun ColumnScope.Suggestions(
     groups: List<SuggestionGroupUi>,
     regularKeys: Set<String>,
+    aisleNames: Map<String, String>,
     onToggle: (Suggestion) -> Unit,
     onAddAll: (SuggestionGroupUi) -> Unit,
     onToggleRegular: (Suggestion) -> Unit,
+    onDismissMeal: (SuggestionGroupUi) -> Unit,
+    onDismissSuggestion: (Suggestion) -> Unit,
 ) {
     if (groups.isEmpty()) {
         Box(
@@ -226,27 +300,48 @@ private fun ColumnScope.Suggestions(
         }
         return
     }
+    // Each category shows just its first rows so a long grid (or several sources at once) can't push
+    // everything else off-screen; the rest expand on demand, tracked per source id.
+    val expandedSources = remember { mutableStateMapOf<String, Boolean>() }
     LazyColumn(
         contentPadding = PaddingValues(vertical = 16.dp),
         modifier = Modifier.fillMaxWidth().weight(1f),
     ) {
         groups.forEach { group ->
             item(key = "header-${group.sourceId}") {
-                SuggestionSectionHeader(group = group, onAddAll = { onAddAll(group) })
+                SuggestionSectionHeader(
+                    group = group,
+                    onAddAll = { onAddAll(group) },
+                    // Whole-meal dismiss lives in the header; other groups dismiss per-card instead.
+                    onDismiss = if (group.sourceId.startsWith(RegularMealSource.ID)) {
+                        { onDismissMeal(group) }
+                    } else {
+                        null
+                    },
+                )
             }
             // Rows of three so a plain LazyColumn can host the grid without nested vertical scroll.
-            group.items.chunked(3).forEachIndexed { index, row ->
+            val rows = group.items.chunked(3)
+            val expanded = expandedSources[group.sourceId] == true
+            val visibleRows = if (expanded) rows else rows.take(COLLAPSED_SUGGESTION_ROWS)
+            visibleRows.forEachIndexed { index, row ->
                 item(key = "${group.sourceId}-row-$index") {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     ) {
                         for (cell in row) {
+                            val cellIsRegular = cell.suggestion.key in regularKeys
                             SuggestionCard(
                                 item = cell,
-                                isRegular = cell.suggestion.key in regularKeys,
+                                isRegular = cellIsRegular,
+                                aisleName = aisleNames[cell.suggestion.key],
                                 onClick = { onToggle(cell.suggestion) },
                                 onToggleRegular = { onToggleRegular(cell.suggestion) },
+                                // Dismissing a manual regular makes no sense — unmark it instead.
+                                onNotInterested = if (cellIsRegular) null else {
+                                    { onDismissSuggestion(cell.suggestion) }
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -254,12 +349,47 @@ private fun ColumnScope.Suggestions(
                     }
                 }
             }
+            if (rows.size > COLLAPSED_SUGGESTION_ROWS) {
+                val hidden = group.items.size - rows.take(COLLAPSED_SUGGESTION_ROWS).sumOf { it.size }
+                item(key = "${group.sourceId}-expand") {
+                    ExpandToggle(
+                        expanded = expanded,
+                        hiddenCount = hidden,
+                        onClick = { expandedSources[group.sourceId] = !expanded },
+                    )
+                }
+            }
         }
     }
 }
 
+/** How many rows of a suggestion category show before "Show more" is tapped. */
+private const val COLLAPSED_SUGGESTION_ROWS = 2
+
+/** Rounded highlight shape for a tappable card — a touch larger than the image's own 20.dp corners
+ *  so, with the content inset, the press/hover ripple reads as a concentric rounded frame. */
+private val CARD_SHAPE = RoundedCornerShape(24.dp)
+
+/** Full-width toggle under a category: expands the hidden rows, or collapses back to the first ones. */
 @Composable
-private fun SuggestionSectionHeader(group: SuggestionGroupUi, onAddAll: () -> Unit) {
+private fun ExpandToggle(expanded: Boolean, hiddenCount: Int, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Text(if (expanded) "Show less" else "Show $hiddenCount more")
+        Spacer(Modifier.width(4.dp))
+        Icon(
+            if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun SuggestionSectionHeader(
+    group: SuggestionGroupUi,
+    onAddAll: () -> Unit,
+    onDismiss: (() -> Unit)? = null,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
@@ -269,8 +399,20 @@ private fun SuggestionSectionHeader(group: SuggestionGroupUi, onAddAll: () -> Un
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (onDismiss != null) {
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    Icons.Outlined.VisibilityOff,
+                    contentDescription = "Dismiss ${group.title}",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
         if (group.supportsBulkAdd && !group.allAdded) {
             TextButton(onClick = onAddAll) {
                 Icon(Icons.Outlined.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -286,8 +428,10 @@ private fun SuggestionSectionHeader(group: SuggestionGroupUi, onAddAll: () -> Un
 private fun SuggestionCard(
     item: SuggestionUi,
     isRegular: Boolean,
+    aisleName: String?,
     onClick: () -> Unit,
     onToggleRegular: () -> Unit,
+    onNotInterested: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val suggestion = item.suggestion
@@ -296,13 +440,18 @@ private fun SuggestionCard(
     Box(modifier = modifier) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    keyboard?.hide()
-                    menuExpanded = true
-                },
-            ),
+            // Clip so the press/hover ripple follows rounded corners, and pad so it isn't flush
+            // against the image and label.
+            modifier = Modifier
+                .clip(CARD_SHAPE)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = {
+                        keyboard?.hide()
+                        menuExpanded = true
+                    },
+                )
+                .padding(6.dp),
         ) {
             Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
                 FoodImage(
@@ -312,6 +461,14 @@ private fun SuggestionCard(
                     shape = RoundedCornerShape(20.dp),
                     dimmed = item.added,
                 )
+                // Corner badge, opposite the "added" check so both can show at once: a star for the
+                // user's favorites, otherwise the item's aisle icon. A surface disc keeps it legible
+                // over any photo.
+                if (isRegular) {
+                    CornerBadge(Icons.Filled.Star, "Weekly regular", MaterialTheme.colorScheme.primary)
+                } else if (aisleName != null) {
+                    CornerBadge(aisleIcon(aisleName), aisleName, MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (item.added) {
                     Box(
                         modifier = Modifier
@@ -341,17 +498,6 @@ private fun SuggestionCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             )
-            if (suggestion.reason != null) {
-                Text(
-                    text = suggestion.reason,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
         }
         RegularContextMenu(
             expanded = menuExpanded,
@@ -361,8 +507,48 @@ private fun SuggestionCard(
                 menuExpanded = false
                 onToggleRegular()
             },
+            onNotInterested = onNotInterested?.let {
+                {
+                    menuExpanded = false
+                    it()
+                }
+            },
         )
     }
+}
+
+/** A small round badge in a suggestion card's image corner — the favorite star or an aisle icon. */
+@Composable
+private fun BoxScope.CornerBadge(icon: ImageVector, description: String, tint: Color) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopStart)
+            .padding(6.dp)
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(14.dp))
+    }
+}
+
+/**
+ * Icon for a supermarket aisle, matched on its default name; renamed or custom aisles fall back to a
+ * generic category tag. Shown on a suggestion card in place of the favorite star.
+ */
+private fun aisleIcon(aisleName: String): ImageVector = when (aisleName) {
+    "Fruit & Vegetables" -> Icons.Outlined.Eco
+    "Bakery" -> Icons.Outlined.BakeryDining
+    "Dairy & Eggs" -> Icons.Outlined.Egg
+    "Meat & Fish" -> Icons.Outlined.SetMeal
+    "Pasta & Rice" -> Icons.Outlined.RiceBowl
+    "Cans & Jars" -> Icons.Outlined.Inventory2
+    "Frozen" -> Icons.Outlined.AcUnit
+    "Drinks" -> Icons.Outlined.LocalDrink
+    "Snacks" -> Icons.Outlined.Cookie
+    "Household" -> Icons.Outlined.CleaningServices
+    else -> Icons.Outlined.Category
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -467,13 +653,16 @@ private fun FoodPickCard(
     Box {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    keyboard?.hide()
-                    menuExpanded = true
-                },
-            ),
+            modifier = Modifier
+                .clip(CARD_SHAPE)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = {
+                        keyboard?.hide()
+                        menuExpanded = true
+                    },
+                )
+                .padding(6.dp),
         ) {
             FoodImage(
                 url = food.imageUrl,
@@ -510,5 +699,4 @@ private fun LokcalFood.toSuggestion(): Suggestion =
         name = name,
         imageUrl = imageUrl,
         lokcalFoodId = id,
-        reason = null,
     )

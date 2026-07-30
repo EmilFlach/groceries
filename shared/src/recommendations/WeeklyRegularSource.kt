@@ -12,17 +12,17 @@ fun interface FrequentFoodProvider {
 }
 
 /**
- * The "Weekly regulars" source: the foods you buy most often, gathered from two inputs and merged
- * into a single group.
+ * The foods you buy most often, gathered from two inputs kept in *separate* groups so the user's
+ * hand-curated regulars aren't diluted by machine estimates:
  *
- *  - **Auto-inferred** from Lokcal's Intake log via [FrequentFoodProvider] — foods eaten across at
- *    least [minWeeks] distinct weeks in the last [windowDays]. Empty on platforms without a Lokcal
- *    snapshot (iOS/wasm).
- *  - **Manually marked** regulars from the Groceries DB ([RegularItemRepository]) — works on every
- *    platform, and lets the user pin items Lokcal wouldn't know about (e.g. household goods).
+ *  - **"Weekly regulars"** — the [RegularItemRepository] items the user explicitly marked. Works on
+ *    every platform, and lets them pin things Lokcal wouldn't know about (e.g. household goods).
+ *  - **"Suggested"** — auto-inferred from Lokcal's Intake log via [FrequentFoodProvider]: foods
+ *    eaten across at least [minWeeks] distinct weeks in the last [windowDays]. Empty on platforms
+ *    without a Lokcal snapshot (iOS/wasm).
  *
- * Manual pins come first and win on identity collision (they carry the user's chosen name/image),
- * deduped with the auto list by [normalizeKey].
+ * An auto food that's already a manual regular is dropped from "Suggested" (deduped by
+ * [normalizeKey]), so a food never shows in both — the manual pin wins.
  */
 class WeeklyRegularSource(
     private val frequentFoods: FrequentFoodProvider,
@@ -35,32 +35,24 @@ class WeeklyRegularSource(
     override val id: String = ID
 
     override suspend fun load(): List<SuggestionGroup> {
-        val manual = regulars.all().map {
-            Suggestion(
-                key = it.food_key,
-                name = it.name,
-                imageUrl = it.image_url,
-                lokcalFoodId = it.lokcal_food_id,
-                reason = "Marked as regular",
-            )
-        }
-        val weeksInWindow = windowDays / 7
-        val auto = frequentFoods.frequentFoods(windowDays, minWeeks, limit).map {
-            Suggestion(
-                key = normalizeKey(it.food.name),
-                name = it.food.name,
-                imageUrl = it.food.imageUrl,
-                lokcalFoodId = it.food.id,
-                reason = "${it.distinctWeeks} of the last $weeksInWindow weeks",
-            )
-        }
+        val manual = regulars.all()
+            .map { Suggestion(key = it.food_key, name = it.name, imageUrl = it.image_url, lokcalFoodId = it.lokcal_food_id) }
+            .distinctBy { it.key }
+        val manualKeys = manual.mapTo(HashSet()) { it.key }
+        val suggested = frequentFoods.frequentFoods(windowDays, minWeeks, limit)
+            .map { Suggestion(key = normalizeKey(it.food.name), name = it.food.name, imageUrl = it.food.imageUrl, lokcalFoodId = it.food.id) }
+            .distinctBy { it.key }
+            .filterNot { it.key in manualKeys }
 
-        val merged = (manual + auto).distinctBy { it.key }
-        return if (merged.isEmpty()) emptyList()
-        else listOf(SuggestionGroup(id, "Weekly regulars", merged, supportsBulkAdd = true))
+        return buildList {
+            if (manual.isNotEmpty()) add(SuggestionGroup(MANUAL_ID, "Weekly regulars", manual, supportsBulkAdd = true))
+            if (suggested.isNotEmpty()) add(SuggestionGroup(SUGGESTED_ID, "Suggested", suggested, supportsBulkAdd = true))
+        }
     }
 
     companion object {
         const val ID = "weekly-regulars"
+        const val MANUAL_ID = "weekly-regulars"
+        const val SUGGESTED_ID = "suggested"
     }
 }

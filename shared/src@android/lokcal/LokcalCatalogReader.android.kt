@@ -32,6 +32,12 @@ actual class LokcalCatalogReader(private val context: Context) {
     actual suspend fun frequentFoods(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentFood> =
         read(emptyList()) { it.regularFoods(windowDays, minWeeks, limit) }
 
+    actual suspend fun frequentMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal> =
+        read(emptyList()) { it.regularMeals(windowDays, minWeeks, limit) }
+
+    actual suspend fun mealItems(mealId: Long): List<LokcalFood> =
+        read(emptyList()) { it.mealItems(mealId) }
+
     /** Runs [block] against the cached read-only snapshot — off the main thread and one at a time. */
     private suspend fun <T> read(default: T, block: suspend (LokcalSnapshotQueries) -> T): T =
         withContext(Dispatchers.IO) {
@@ -85,6 +91,15 @@ private class AndroidLokcalQueries(private val db: SQLiteDatabase) : LokcalSnaps
             arrayOf(windowDays.toString(), minWeeks.toString(), limit.toString()),
         ).use { it.readFrequentFoods() }
 
+    override suspend fun regularMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal> =
+        db.rawQuery(
+            LokcalSearchSql.REGULAR_MEALS,
+            arrayOf(windowDays.toString(), minWeeks.toString(), limit.toString()),
+        ).use { it.readFrequentMeals() }
+
+    override suspend fun mealItems(mealId: Long): List<LokcalFood> =
+        db.rawQuery(LokcalSearchSql.MEAL_ITEMS, arrayOf(mealId.toString())).use { it.readFoods() }
+
     private fun query(sql: String, args: Array<String>?): List<LokcalFood> =
         db.rawQuery(sql, args).use { it.readFoods() }
 
@@ -99,6 +114,19 @@ private class AndroidLokcalQueries(private val db: SQLiteDatabase) : LokcalSnaps
         while (moveToNext()) {
             // Columns 0..6 are the food (COLS_F); 7 = distinct weeks, 8 = last eaten.
             out += LokcalFrequentFood(readFood(), distinctWeeks = getInt(7), lastEaten = getString(8))
+        }
+        return out
+    }
+
+    private fun Cursor.readFrequentMeals(): List<LokcalFrequentMeal> {
+        val out = ArrayList<LokcalFrequentMeal>(count)
+        while (moveToNext()) {
+            // Columns 0 = id, 1 = name, 2 = image_url, 3 = distinct weeks, 4 = last eaten.
+            out += LokcalFrequentMeal(
+                LokcalMeal(id = getLong(0), name = getString(1), imageUrl = getString(2)),
+                distinctWeeks = getInt(3),
+                lastEaten = getString(4),
+            )
         }
         return out
     }

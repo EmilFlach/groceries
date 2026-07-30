@@ -6,14 +6,12 @@ package com.emilflach.groceries.recommendations
  *
  * @param lokcalFoodId the Lokcal catalog id when this came from a catalog food; null for
  *   free-typed regulars (which get a synthetic id when added, like other manual items).
- * @param reason a short sub-label shown under the name, e.g. "5 of the last 12 weeks".
  */
 data class Suggestion(
     val key: String,
     val name: String,
     val imageUrl: String?,
     val lokcalFoodId: Long?,
-    val reason: String? = null,
 )
 
 /**

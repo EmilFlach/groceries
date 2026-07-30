@@ -38,26 +38,37 @@ class WeeklyRegularSourceTest {
     }
 
     @Test
-    fun mergesManualAndAutoIntoOneGroup() = runTest {
+    fun splitsManualAndAutoIntoSeparateGroups() = runTest {
         regulars.mark("Napkins", null, null)
         val source = WeeklyRegularSource(frequent("Milk", "Eggs"), regulars)
 
-        val group = source.load().single()
-        assertEquals("Weekly regulars", group.title)
-        assertTrue(group.supportsBulkAdd)
-        assertEquals(setOf("napkins", "milk", "eggs"), group.suggestions.map { it.key }.toSet())
+        val groups = source.load()
+        assertEquals(listOf("Weekly regulars", "Suggested"), groups.map { it.title })
+        assertTrue(groups.all { it.supportsBulkAdd })
+        assertEquals(setOf("napkins"), groups[0].suggestions.map { it.key }.toSet())
+        assertEquals(setOf("milk", "eggs"), groups[1].suggestions.map { it.key }.toSet())
     }
 
     @Test
-    fun manualWinsOnKeyCollision() = runTest {
+    fun autoFoodAlreadyMarkedManualIsNotSuggestedAgain() = runTest {
         regulars.mark("Milk", "https://user/milk.jpg", 42L)
-        val source = WeeklyRegularSource(frequent("Milk"), regulars)
+        val source = WeeklyRegularSource(frequent("Milk", "Eggs"), regulars)
 
-        val milk = source.load().single().suggestions.single { it.key == "milk" }
-        // The manual pin's image/id/reason survive, not the auto one.
+        val groups = source.load()
+        // Milk stays only under the manual group, carrying the user's own image/id.
+        val milk = groups.single { it.title == "Weekly regulars" }.suggestions.single { it.key == "milk" }
         assertEquals("https://user/milk.jpg", milk.imageUrl)
         assertEquals(42L, milk.lokcalFoodId)
-        assertEquals("Marked as regular", milk.reason)
+        // ...and isn't repeated under Suggested, which keeps only the non-regular auto foods.
+        assertEquals(listOf("eggs"), groups.single { it.title == "Suggested" }.suggestions.map { it.key })
+    }
+
+    @Test
+    fun onlyManualShowsSingleWeeklyRegularsGroup() = runTest {
+        regulars.mark("Napkins", null, null)
+        val source = WeeklyRegularSource(frequent(), regulars)
+
+        assertEquals(listOf("Weekly regulars"), source.load().map { it.title })
     }
 
     @Test

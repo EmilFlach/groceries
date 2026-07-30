@@ -47,7 +47,20 @@ class ShoppingListRepository(database: Database) {
 
     @OptIn(ExperimentalTime::class)
     suspend fun setChecked(id: Long, checked: Boolean) {
-        queries.setChecked(if (checked) Clock.System.now().toString() else null, id)
+        if (checked) {
+            queries.setChecked(Clock.System.now().toString(), id)
+            return
+        }
+        // Reviving a checked row must not produce a second *active* row for the same food: the
+        // partial unique index (active rows only) forbids it and unchecking would otherwise crash
+        // with a constraint violation. If that food is already active, this checked row is redundant
+        // — drop it instead of unchecking. Mirrors uncheckAll's guard for the single-row case.
+        val row = queries.selectById(id).awaitAsOneOrNull() ?: return
+        if (queries.selectActiveByFoodId(row.lokcal_food_id).awaitAsOneOrNull() != null) {
+            queries.deleteById(id)
+        } else {
+            queries.setChecked(null, id)
+        }
     }
 
     @OptIn(ExperimentalTime::class)

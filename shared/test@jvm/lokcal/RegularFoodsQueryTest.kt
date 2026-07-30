@@ -40,6 +40,8 @@ class RegularFoodsQueryTest {
     fun teardown() = connection.close()
 
     private fun food(id: Long, name: String) {
+        // Synthetic Lokcal tables live only in this in-memory DB, so the IDE's SQL resolver can't see them.
+        //noinspection SqlResolve
         connection.prepareStatement("INSERT INTO Food(id, name) VALUES (?, ?)").use {
             it.setLong(1, id); it.setString(2, name); it.executeUpdate()
         }
@@ -47,6 +49,7 @@ class RegularFoodsQueryTest {
 
     /** Logs an intake [daysAgo] days before now; [type] 'FOOD' unless overridden. */
     private fun intake(foodId: Long, daysAgo: Int, type: String = "FOOD") {
+        //noinspection SqlResolve
         connection.prepareStatement(
             "INSERT INTO Intake(source_type, source_food_id, timestamp) VALUES (?, ?, date('now', ?))",
         ).use {
@@ -115,5 +118,24 @@ class RegularFoodsQueryTest {
         food(3, "Butter"); intake(3, 1)
 
         assertEquals(2, queries.regularFoods(windowDays = 60, minWeeks = 1, limit = 2).size)
+    }
+
+    @Test
+    @Suppress("SqlSourceToSinkFlow") // constant query text from LokcalSearchSql; not user input
+    fun thresholdHoldsWhenParamsBoundAsText() = runTest {
+        // Android's SQLiteDatabase.rawQuery binds every arg as TEXT. Without the CAST in the SQL,
+        // `weeks >= '3'` compares an INTEGER count against TEXT and is always false, so nothing
+        // comes back — the bug behind "no suggestions on device". Run the raw SQL with string-bound
+        // params (what Android does) and confirm the threshold still filters correctly.
+        food(1, "Milk"); intake(1, 1) // 1 week
+        food(2, "Eggs"); intake(2, 1); intake(2, 8); intake(2, 15) // 3 weeks
+
+        val names = ArrayList<String>()
+        connection.prepareStatement(LokcalSearchSql.REGULAR_FOODS).use { st ->
+            st.setString(1, "60"); st.setString(2, "3"); st.setString(3, "10")
+            st.executeQuery().use { rs -> while (rs.next()) names += rs.getString(2) }
+        }
+
+        assertEquals(listOf("Eggs"), names)
     }
 }

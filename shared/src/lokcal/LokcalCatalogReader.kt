@@ -19,4 +19,14 @@ expect class LokcalCatalogReader {
      * at [limit]. Empty on platforms without a Lokcal snapshot (iOS/wasm).
      */
     suspend fun frequentFoods(windowDays: Int = 84, minWeeks: Int = 3, limit: Int = 40): List<LokcalFrequentFood>
+
+    /**
+     * Meals cooked across at least [minWeeks] distinct calendar weeks within the last [windowDays]
+     * — the signal for "meals you cook regularly" recommendations, each surfaced as its ingredient
+     * list. Most-weeks-first, capped at [limit]. Empty on platforms without a Lokcal snapshot.
+     */
+    suspend fun frequentMeals(windowDays: Int = 84, minWeeks: Int = 2, limit: Int = 10): List<LokcalFrequentMeal>
+
+    /** The ingredient foods of a meal (see [frequentMeals]), in the meal's own item order. */
+    suspend fun mealItems(mealId: Long): List<LokcalFood>
 }
