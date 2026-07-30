@@ -15,20 +15,23 @@ data class Suggestion(
 )
 
 /**
- * A titled block of suggestions from one source, e.g. "Weekly regulars" or a recipe's ingredients.
+ * A titled block of suggestions from one source, e.g. "Regulars" or a recipe's ingredients.
  *
  * @param supportsBulkAdd whether the UI should offer an "Add all" action for this group (true for
- *   weekly regulars and, later, "add the whole recipe").
+ *   regulars and, later, "add the whole recipe").
+ * @param imageUrl an optional thumbnail for the group header — set for meals (the meal's photo);
+ *   null for the flat food groups.
  */
 data class SuggestionGroup(
     val sourceId: String,
     val title: String,
     val suggestions: List<Suggestion>,
     val supportsBulkAdd: Boolean,
+    val imageUrl: String? = null,
 )
 
 /**
- * A pluggable producer of suggestion groups. New recommendation kinds (weekly regulars today;
+ * A pluggable producer of suggestion groups. New recommendation kinds (regulars today;
  * recipe ingredients, "meals you haven't had lately", etc. later) implement this and are added to
  * the [RecommendationRepository]'s source list without touching existing sources.
  *

@@ -15,7 +15,7 @@ fun interface FrequentFoodProvider {
  * The foods you buy most often, gathered from two inputs kept in *separate* groups so the user's
  * hand-curated regulars aren't diluted by machine estimates:
  *
- *  - **"Weekly regulars"** — the [RegularItemRepository] items the user explicitly marked. Works on
+ *  - **"Regulars"** — the [RegularItemRepository] items the user explicitly marked. Works on
  *    every platform, and lets them pin things Lokcal wouldn't know about (e.g. household goods).
  *  - **"Suggested"** — auto-inferred from Lokcal's Intake log via [FrequentFoodProvider]: foods
  *    eaten across at least [minWeeks] distinct weeks in the last [windowDays]. Empty on platforms
@@ -45,7 +45,7 @@ class WeeklyRegularSource(
             .filterNot { it.key in manualKeys }
 
         return buildList {
-            if (manual.isNotEmpty()) add(SuggestionGroup(MANUAL_ID, "Weekly regulars", manual, supportsBulkAdd = true))
+            if (manual.isNotEmpty()) add(SuggestionGroup(MANUAL_ID, "Regulars", manual, supportsBulkAdd = true))
             if (suggested.isNotEmpty()) add(SuggestionGroup(SUGGESTED_ID, "Suggested", suggested, supportsBulkAdd = true))
         }
     }

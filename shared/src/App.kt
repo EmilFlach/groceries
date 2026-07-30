@@ -18,6 +18,7 @@ import com.emilflach.groceries.data.RegularItemRepository
 import com.emilflach.groceries.data.ShoppingListRepository
 import com.emilflach.groceries.data.SqlDriverFactory
 import com.emilflach.groceries.data.createDatabase
+import com.emilflach.groceries.data.normalizeKey
 import com.emilflach.groceries.lokcal.LokcalCatalogReader
 import com.emilflach.groceries.lokcal.LokcalImportRepository
 import com.emilflach.groceries.lokcal.LokcalFood
@@ -25,6 +26,7 @@ import com.emilflach.groceries.lokcal.LokcalFrequentMeal
 import com.emilflach.groceries.recommendations.FrequentMealProvider
 import com.emilflach.groceries.recommendations.RecommendationRepository
 import com.emilflach.groceries.recommendations.RegularMealSource
+import com.emilflach.groceries.recommendations.Suggestion
 import com.emilflach.groceries.recommendations.WeeklyRegularSource
 import com.emilflach.groceries.ui.screens.AddHubScreen
 import com.emilflach.groceries.ui.screens.AisleSettingsScreen
@@ -78,7 +80,7 @@ fun App(
                     lokcalCatalogReader.mealItems(mealId)
             }
             val recommendations = RecommendationRepository(
-                // Weekly regulars first so a food that's both a regular and a meal ingredient stays
+                // Regulars first so a food that's both a regular and a meal ingredient stays
                 // under regulars (see RecommendationRepository's earlier-source-wins dedup).
                 sources = listOf(
                     WeeklyRegularSource(lokcalCatalogReader::frequentFoods, regularItemRepository),
@@ -149,15 +151,27 @@ fun App(
         if (showAddItem) {
             val groups by suggestionsViewModel.groups.collectAsState()
             val regularKeys by suggestionsViewModel.regularKeys.collectAsState()
+            val addedKeys by suggestionsViewModel.onListKeys.collectAsState()
             val aisleNames by suggestionsViewModel.aisleNames.collectAsState()
             AddHubScreen(
                 catalogReader = lokcalCatalogReader,
                 groups = groups,
                 regularKeys = regularKeys,
+                addedKeys = addedKeys,
                 aisleNames = aisleNames,
                 onDismiss = { showAddItem = false },
+                // Route through the shared toggle (not a plain add) so tapping an already-listed
+                // food removes it instead of colliding on the active-food unique index — same
+                // behaviour as the suggestion cards.
                 onFoodSelected = { food ->
-                    shoppingListViewModel.addItem(food.id, food.name, food.imageUrl)
+                    suggestionsViewModel.toggle(
+                        Suggestion(
+                            key = normalizeKey(food.name),
+                            name = food.name,
+                            imageUrl = food.imageUrl,
+                            lokcalFoodId = food.id,
+                        )
+                    )
                 },
                 onAddCustom = { name ->
                     shoppingListViewModel.addManualItem(name)

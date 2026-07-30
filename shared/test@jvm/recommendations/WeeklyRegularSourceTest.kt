@@ -43,7 +43,7 @@ class WeeklyRegularSourceTest {
         val source = WeeklyRegularSource(frequent("Milk", "Eggs"), regulars)
 
         val groups = source.load()
-        assertEquals(listOf("Weekly regulars", "Suggested"), groups.map { it.title })
+        assertEquals(listOf("Regulars", "Suggested"), groups.map { it.title })
         assertTrue(groups.all { it.supportsBulkAdd })
         assertEquals(setOf("napkins"), groups[0].suggestions.map { it.key }.toSet())
         assertEquals(setOf("milk", "eggs"), groups[1].suggestions.map { it.key }.toSet())
@@ -56,7 +56,7 @@ class WeeklyRegularSourceTest {
 
         val groups = source.load()
         // Milk stays only under the manual group, carrying the user's own image/id.
-        val milk = groups.single { it.title == "Weekly regulars" }.suggestions.single { it.key == "milk" }
+        val milk = groups.single { it.title == "Regulars" }.suggestions.single { it.key == "milk" }
         assertEquals("https://user/milk.jpg", milk.imageUrl)
         assertEquals(42L, milk.lokcalFoodId)
         // ...and isn't repeated under Suggested, which keeps only the non-regular auto foods.
@@ -64,11 +64,11 @@ class WeeklyRegularSourceTest {
     }
 
     @Test
-    fun onlyManualShowsSingleWeeklyRegularsGroup() = runTest {
+    fun onlyManualShowsSingleRegularsGroup() = runTest {
         regulars.mark("Napkins", null, null)
         val source = WeeklyRegularSource(frequent(), regulars)
 
-        assertEquals(listOf("Weekly regulars"), source.load().map { it.title })
+        assertEquals(listOf("Regulars"), source.load().map { it.title })
     }
 
     @Test

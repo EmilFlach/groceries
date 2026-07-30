@@ -14,19 +14,22 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** A [Suggestion] plus whether it's currently on the active shopping list (drives the added mark). */
 data class SuggestionUi(val suggestion: Suggestion, val added: Boolean)
 
-/** A source's group, resolved for display. [allAdded] hides "Add all" once everything's on the list. */
+/** A source's group, resolved for display. [allAdded] hides "Add all" once everything's on the list.
+ *  [imageUrl] is the header thumbnail (a meal's photo; null for the flat food groups). */
 data class SuggestionGroupUi(
     val sourceId: String,
     val title: String,
     val items: List<SuggestionUi>,
     val supportsBulkAdd: Boolean,
     val allAdded: Boolean,
+    val imageUrl: String? = null,
 )
 
 /**
@@ -55,6 +58,14 @@ class SuggestionsViewModel(
     /** Normalized keys of the manually-marked regulars, so any card (even one from the search grid)
      *  can show the right "Mark as regular" / "Remove from regulars" action. */
     val regularKeys: StateFlow<Set<String>> = _regularKeys.asStateFlow()
+
+    /** Normalized keys of every food currently on the list (checked *or* unchecked), derived live
+     *  from the shared list — same rule as [SuggestionUi.added], so the search grid can show the
+     *  identical "added" check as the suggestion cards. */
+    val onListKeys: StateFlow<Set<String>> =
+        shoppingList.items
+            .map { items -> items.asSequence().map { normalizeKey(it.name) }.toSet() }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     /** Normalized key → assigned aisle name, derived from the shared list's labels + aisles, so a
      *  non-regular suggestion card can show which aisle it belongs to. Absent key = no aisle. */
@@ -106,6 +117,7 @@ class SuggestionsViewModel(
                     items = ui,
                     supportsBulkAdd = group.supportsBulkAdd,
                     allAdded = ui.all { it.added },
+                    imageUrl = group.imageUrl,
                 )
             }
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

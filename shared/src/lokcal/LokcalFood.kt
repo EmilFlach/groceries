@@ -16,7 +16,7 @@ data class LokcalFood(
 
 /**
  * A [LokcalFood] the user consumed across several recent weeks in Lokcal's Intake log —
- * the raw signal behind "weekly regulars" recommendations.
+ * the raw signal behind "regulars" recommendations.
  *
  * @param distinctWeeks how many distinct calendar weeks (within the query window) it appeared in
  * @param lastEaten the most recent Intake timestamp for it (raw text, newest first ordering only)

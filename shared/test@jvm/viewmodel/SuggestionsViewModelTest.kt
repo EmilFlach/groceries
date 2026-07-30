@@ -62,7 +62,7 @@ class SuggestionsViewModelTest {
         val source = object : RecommendationSource {
             override val id = "fake"
             override suspend fun load() =
-                listOf(SuggestionGroup("fake", "Weekly regulars", listOf(milk, eggs, napkins), true))
+                listOf(SuggestionGroup("fake", "Regulars", listOf(milk, eggs, napkins), true))
         }
         viewModel = SuggestionsViewModel(RecommendationRepository(listOf(source)), regulars, dismissed, shoppingList)
     }

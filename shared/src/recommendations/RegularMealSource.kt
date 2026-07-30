@@ -16,10 +16,14 @@ interface FrequentMealProvider {
 }
 
 /**
- * The "meals you cook regularly" source: for each meal logged across at least [minWeeks] distinct
- * weeks in the last [windowDays] (auto-inferred from Lokcal's Intake), one suggestion group holding
- * that meal's ingredient foods, with bulk-add wired to "add the whole recipe". Groups come
- * most-regular first — the same ordering [FrequentMealProvider.frequentMeals] returns.
+ * The meals source: one suggestion group per meal (auto-inferred from Lokcal's Intake), holding that
+ * meal's ingredient foods with bulk-add wired to "add the whole recipe". Groups come most-regular
+ * first — the ordering [FrequentMealProvider.frequentMeals] returns — so the top few read as "your
+ * regulars" while the rest of your cooked meals stay available behind the UI's "show more meals".
+ *
+ * Defaults are deliberately broad ([windowDays] ≈ a year, [minWeeks] = 1) so this surfaces the user's
+ * whole recent meal history, not just a tight "cooked ≥2 weeks lately" slice — the UI, not the query,
+ * decides how many to show up front.
  *
  * Each ingredient is an ordinary catalog-food [Suggestion], so the ViewModel/UI toggle, dedup and
  * "already on the list" marking all apply unchanged — a meal is just a pre-grouped set of foods.
@@ -29,9 +33,9 @@ interface FrequentMealProvider {
  */
 class RegularMealSource(
     private val meals: FrequentMealProvider,
-    private val windowDays: Int = 84,
-    private val minWeeks: Int = 2,
-    private val limit: Int = 10,
+    private val windowDays: Int = 365,
+    private val minWeeks: Int = 1,
+    private val limit: Int = 50,
 ) : RecommendationSource {
 
     override val id: String = ID
@@ -55,6 +59,7 @@ class RegularMealSource(
                 title = meal.name,
                 suggestions = ingredients,
                 supportsBulkAdd = true,
+                imageUrl = meal.imageUrl,
             )
         }
 

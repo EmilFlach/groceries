@@ -10,7 +10,7 @@ data class DismissedKeys(val foods: Set<String>, val meals: Set<String>)
  * Persists the foods and meals the user dismissed ("Not interested") from auto recommendations.
  * Keyed by [normalizeKey] so a dismissal survives across shops and matches how suggestions are keyed.
  * Read by [com.emilflach.groceries.viewmodel.SuggestionsViewModel], which filters dismissed items out
- * of the "Suggested" group and meal groups (manual "Weekly regulars" are untouched).
+ * of the "Suggested" group and meal groups (manual "Regulars" are untouched).
  */
 class DismissedSuggestionRepository(database: Database) {
     private val queries = database.dismissedSuggestionQueries
