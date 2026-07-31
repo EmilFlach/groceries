@@ -27,6 +27,6 @@ expect class LokcalCatalogReader {
      */
     suspend fun frequentMeals(windowDays: Int = 84, minWeeks: Int = 2, limit: Int = 10): List<LokcalFrequentMeal>
 
-    /** The ingredient foods of a meal (see [frequentMeals]), in the meal's own item order. */
-    suspend fun mealItems(mealId: Long): List<LokcalFood>
+    /** The ingredients of a meal (food + required grams; see [frequentMeals]), in item order. */
+    suspend fun mealItems(mealId: Long): List<LokcalMealItem>
 }

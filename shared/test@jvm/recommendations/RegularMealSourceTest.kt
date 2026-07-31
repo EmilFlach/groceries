@@ -3,6 +3,7 @@ package com.emilflach.groceries.recommendations
 import com.emilflach.groceries.lokcal.LokcalFood
 import com.emilflach.groceries.lokcal.LokcalFrequentMeal
 import com.emilflach.groceries.lokcal.LokcalMeal
+import com.emilflach.groceries.lokcal.LokcalMealItem
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,7 +11,8 @@ import kotlin.test.assertTrue
 
 class RegularMealSourceTest {
 
-    private fun food(id: Long, name: String) = LokcalFood(id, name, 0.0, null, null, null, null)
+    private fun item(id: Long, name: String, grams: Double = 0.0) =
+        LokcalMealItem(LokcalFood(id, name, 0.0, null, null, null, null), grams)
 
     private fun frequent(id: Long, name: String, weeks: Int = 3) =
         LokcalFrequentMeal(LokcalMeal(id, name, null), distinctWeeks = weeks, lastEaten = null)
@@ -18,7 +20,7 @@ class RegularMealSourceTest {
     /** A fake provider: fixed meals (in the order given) and a per-meal-id ingredient map. */
     private fun provider(
         meals: List<LokcalFrequentMeal>,
-        items: Map<Long, List<LokcalFood>>,
+        items: Map<Long, List<LokcalMealItem>>,
     ) = object : FrequentMealProvider {
         override suspend fun frequentMeals(windowDays: Int, minWeeks: Int, limit: Int) = meals
         override suspend fun mealItems(mealId: Long) = items[mealId].orEmpty()
@@ -30,8 +32,8 @@ class RegularMealSourceTest {
             provider(
                 meals = listOf(frequent(1, "Pasta"), frequent(2, "Curry")),
                 items = mapOf(
-                    1L to listOf(food(10, "Spaghetti"), food(11, "Tomato")),
-                    2L to listOf(food(20, "Rice"), food(21, "Chicken")),
+                    1L to listOf(item(10, "Spaghetti", grams = 200.0), item(11, "Tomato")),
+                    2L to listOf(item(20, "Rice"), item(21, "Chicken")),
                 ),
             ),
         )
@@ -42,6 +44,8 @@ class RegularMealSourceTest {
         assertTrue(groups.all { it.supportsBulkAdd }, "each meal offers 'add the whole recipe'")
         assertEquals(listOf("spaghetti", "tomato"), groups[0].suggestions.map { it.key })
         assertEquals(10L, groups[0].suggestions[0].lokcalFoodId)
+        // The meal's required grams ride along as a pre-filled note.
+        assertEquals("200 g", groups[0].suggestions[0].note)
         assertEquals(listOf("regular-meals:1", "regular-meals:2"), groups.map { it.sourceId })
     }
 
@@ -50,7 +54,7 @@ class RegularMealSourceTest {
         val source = RegularMealSource(
             provider(
                 meals = listOf(frequent(1, "Empty"), frequent(2, "Curry")),
-                items = mapOf(2L to listOf(food(20, "Rice"))),
+                items = mapOf(2L to listOf(item(20, "Rice"))),
             ),
         )
 
@@ -62,7 +66,7 @@ class RegularMealSourceTest {
         val source = RegularMealSource(
             provider(
                 meals = listOf(frequent(1, "Pasta")),
-                items = mapOf(1L to listOf(food(10, "Tomato"), food(11, "tomato"))),
+                items = mapOf(1L to listOf(item(10, "Tomato"), item(11, "tomato"))),
             ),
         )
 
@@ -72,5 +76,14 @@ class RegularMealSourceTest {
     @Test
     fun emptyWhenNoMeals() = runTest {
         assertEquals(emptyList(), RegularMealSource(provider(emptyList(), emptyMap())).load())
+    }
+
+    @Test
+    fun formatGramsTrimsWholeNumbersAndDropsNonPositive() {
+        assertEquals("250 g", formatGrams(250.0))
+        assertEquals("62.5 g", formatGrams(62.5))
+        assertEquals("12.3 g", formatGrams(12.34)) // one decimal place
+        assertEquals(null, formatGrams(0.0))
+        assertEquals(null, formatGrams(-5.0))
     }
 }

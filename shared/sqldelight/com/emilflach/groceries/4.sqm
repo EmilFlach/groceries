@@ -1,0 +1,4 @@
+-- Adds a free-text note per shopping-list item (grams/amounts or any reminder). Fresh installs get
+-- it straight from the .sq CREATE statement; this migration brings existing databases (schema v4)
+-- up to v5.
+ALTER TABLE ShoppingListItem ADD COLUMN note TEXT;

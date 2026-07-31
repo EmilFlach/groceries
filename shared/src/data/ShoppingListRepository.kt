@@ -18,12 +18,12 @@ class ShoppingListRepository(database: Database) {
 
     suspend fun getAll(): List<ShoppingListItem> = queries.selectAll().awaitAsList()
 
-    suspend fun add(lokcalFoodId: Long, name: String, imageUrl: String?): AddItemResult {
+    suspend fun add(lokcalFoodId: Long, name: String, imageUrl: String?, note: String? = null): AddItemResult {
         if (queries.selectActiveByFoodId(lokcalFoodId).awaitAsOneOrNull() != null) {
             return AddItemResult.AlreadyOnList
         }
         val id = queries.transactionWithResult {
-            queries.insertItem(lokcalFoodId, name, imageUrl)
+            queries.insertItem(lokcalFoodId, name, imageUrl, note)
             queries.selectLastInsertRowId().awaitAsOne()
         }
         return AddItemResult.Added(id)
@@ -35,14 +35,19 @@ class ShoppingListRepository(database: Database) {
      * positive) and each custom item stays distinct under the active-food unique index — letting
      * several custom items coexist and skipping the "already on list" dedup entirely.
      */
-    suspend fun addManual(name: String): AddItemResult.Added {
+    suspend fun addManual(name: String, note: String? = null): AddItemResult.Added {
         val id = queries.transactionWithResult {
             val minFoodId = queries.selectMinFoodId { min -> min ?: 0L }.awaitAsOne()
             val syntheticFoodId = minOf(0L, minFoodId) - 1
-            queries.insertItem(syntheticFoodId, name, null)
+            queries.insertItem(syntheticFoodId, name, null, note)
             queries.selectLastInsertRowId().awaitAsOne()
         }
         return AddItemResult.Added(id)
+    }
+
+    /** Sets (or clears, with a null/blank value) the free-text note on an item. */
+    suspend fun updateNote(id: Long, note: String?) {
+        queries.updateNote(note?.trim()?.ifBlank { null }, id)
     }
 
     @OptIn(ExperimentalTime::class)

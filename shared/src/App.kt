@@ -21,8 +21,8 @@ import com.emilflach.groceries.data.createDatabase
 import com.emilflach.groceries.data.normalizeKey
 import com.emilflach.groceries.lokcal.LokcalCatalogReader
 import com.emilflach.groceries.lokcal.LokcalImportRepository
-import com.emilflach.groceries.lokcal.LokcalFood
 import com.emilflach.groceries.lokcal.LokcalFrequentMeal
+import com.emilflach.groceries.lokcal.LokcalMealItem
 import com.emilflach.groceries.recommendations.FrequentMealProvider
 import com.emilflach.groceries.recommendations.RecommendationRepository
 import com.emilflach.groceries.recommendations.RegularMealSource
@@ -76,7 +76,7 @@ fun App(
                 override suspend fun frequentMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal> =
                     lokcalCatalogReader.frequentMeals(windowDays, minWeeks, limit)
 
-                override suspend fun mealItems(mealId: Long): List<LokcalFood> =
+                override suspend fun mealItems(mealId: Long): List<LokcalMealItem> =
                     lokcalCatalogReader.mealItems(mealId)
             }
             val recommendations = RecommendationRepository(
@@ -153,12 +153,16 @@ fun App(
             val regularKeys by suggestionsViewModel.regularKeys.collectAsState()
             val addedKeys by suggestionsViewModel.onListKeys.collectAsState()
             val aisleNames by suggestionsViewModel.aisleNames.collectAsState()
+            val aisles by shoppingListViewModel.aisles.collectAsState()
+            val aisleIdByKey by shoppingListViewModel.labels.collectAsState()
             AddHubScreen(
                 catalogReader = lokcalCatalogReader,
                 groups = groups,
                 regularKeys = regularKeys,
                 addedKeys = addedKeys,
                 aisleNames = aisleNames,
+                aisles = aisles,
+                aisleIdByKey = aisleIdByKey,
                 onDismiss = { showAddItem = false },
                 // Route through the shared toggle (not a plain add) so tapping an already-listed
                 // food removes it instead of colliding on the active-food unique index — same
@@ -179,6 +183,8 @@ fun App(
                 onToggleSuggestion = { suggestionsViewModel.toggle(it) },
                 onAddAll = { suggestionsViewModel.addAll(it) },
                 onToggleRegular = { suggestionsViewModel.markRegular(it) },
+                onAssignAisle = { suggestion, aisleId -> shoppingListViewModel.setLabel(suggestion.name, aisleId) },
+                onClearAisle = { suggestion -> shoppingListViewModel.clearLabel(suggestion.name) },
                 onDismissMeal = { suggestionsViewModel.dismissMeal(it) },
                 onRestoreMeal = { suggestionsViewModel.restoreMeal(it) },
                 onDismissSuggestion = { suggestionsViewModel.dismiss(it) },

@@ -168,8 +168,8 @@ class SuggestionsViewModel(
             when {
                 existing.isNotEmpty() -> existing.forEach { shoppingList.remove(it.id) }
                 suggestion.lokcalFoodId != null ->
-                    shoppingList.addItem(suggestion.lokcalFoodId, suggestion.name, suggestion.imageUrl)
-                else -> shoppingList.addManualItem(suggestion.name)
+                    shoppingList.addItem(suggestion.lokcalFoodId, suggestion.name, suggestion.imageUrl, suggestion.note)
+                else -> shoppingList.addManualItem(suggestion.name, suggestion.note)
             }
         }
     }

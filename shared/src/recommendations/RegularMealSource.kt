@@ -2,8 +2,8 @@ package com.emilflach.groceries.recommendations
 
 import com.emilflach.groceries.data.normalizeKey
 import com.emilflach.groceries.lokcal.LokcalCatalogReader
-import com.emilflach.groceries.lokcal.LokcalFood
 import com.emilflach.groceries.lokcal.LokcalFrequentMeal
+import com.emilflach.groceries.lokcal.LokcalMealItem
 
 /**
  * Supplies the meals cooked across many recent weeks and their ingredient foods — satisfied by
@@ -12,7 +12,7 @@ import com.emilflach.groceries.lokcal.LokcalFrequentMeal
  */
 interface FrequentMealProvider {
     suspend fun frequentMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal>
-    suspend fun mealItems(mealId: Long): List<LokcalFood>
+    suspend fun mealItems(mealId: Long): List<LokcalMealItem>
 }
 
 /**
@@ -44,12 +44,14 @@ class RegularMealSource(
         meals.frequentMeals(windowDays, minWeeks, limit).mapNotNull { frequent ->
             val meal = frequent.meal
             val ingredients = meals.mealItems(meal.id)
-                .map {
+                .map { item ->
                     Suggestion(
-                        key = normalizeKey(it.name),
-                        name = it.name,
-                        imageUrl = it.imageUrl,
-                        lokcalFoodId = it.id,
+                        key = normalizeKey(item.food.name),
+                        name = item.food.name,
+                        imageUrl = item.food.imageUrl,
+                        lokcalFoodId = item.food.id,
+                        // Pre-fill the required grams so the amount rides along onto the list.
+                        note = formatGrams(item.quantityG),
                     )
                 }
                 .distinctBy { it.key }
@@ -66,4 +68,15 @@ class RegularMealSource(
     companion object {
         const val ID = "regular-meals"
     }
+}
+
+/**
+ * Formats a gram quantity as a short shopping note ("250 g", "62.5 g"), trimming a trailing ".0" so
+ * whole amounts read cleanly. Null for a non-positive quantity — there's nothing useful to prefill.
+ */
+internal fun formatGrams(quantityG: Double): String? {
+    if (quantityG <= 0.0) return null
+    val rounded = (quantityG * 10).toLong() / 10.0 // one decimal place, no locale-dependent formatting
+    val text = if (rounded % 1.0 == 0.0) rounded.toLong().toString() else rounded.toString()
+    return "$text g"
 }

@@ -37,7 +37,7 @@ actual class LokcalCatalogReader {
     actual suspend fun frequentMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal> =
         read(emptyList()) { it.regularMeals(windowDays, minWeeks, limit) }
 
-    actual suspend fun mealItems(mealId: Long): List<LokcalFood> =
+    actual suspend fun mealItems(mealId: Long): List<LokcalMealItem> =
         read(emptyList()) { it.mealItems(mealId) }
 
     /** Runs [block] against the cached read-only snapshot — off the main thread and one at a time. */
@@ -118,10 +118,15 @@ internal class JdbcLokcalQueries(private val connection: Connection) : LokcalSna
         }
 
     @Suppress("SqlSourceToSinkFlow")
-    override suspend fun mealItems(mealId: Long): List<LokcalFood> =
+    override suspend fun mealItems(mealId: Long): List<LokcalMealItem> =
         connection.prepareStatement(LokcalSearchSql.MEAL_ITEMS).use { statement ->
             statement.setLong(1, mealId)
-            statement.executeQuery().use { it.readFoods() }
+            statement.executeQuery().use { rs ->
+                val out = ArrayList<LokcalMealItem>()
+                // JDBC is 1-indexed: columns 1..7 are the food (COLS_F); 8 = quantity_g.
+                while (rs.next()) out += LokcalMealItem(rs.readFood(), rs.getDouble(8))
+                out
+            }
         }
 
     private fun query(sql: String, args: List<Any>): List<LokcalFood> =

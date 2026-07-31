@@ -131,6 +131,31 @@ class ShoppingListRepositoryTest {
     }
 
     @Test
+    fun testAddCarriesNote() = runTest {
+        repository.add(1L, "Spaghetti", null, note = "200 g")
+        assertEquals("200 g", repository.getAll().single().note)
+    }
+
+    @Test
+    fun testAddManualCarriesNote() = runTest {
+        repository.addManual("Napkins", note = "2 packs")
+        assertEquals("2 packs", repository.getAll().single().note)
+    }
+
+    @Test
+    fun testUpdateNoteSetsTrimsAndClears() = runTest {
+        val added = repository.add(1L, "Milk", null) as AddItemResult.Added
+        assertNull(repository.getAll().single().note)
+
+        repository.updateNote(added.id, "  1 litre  ")
+        assertEquals("1 litre", repository.getAll().single().note, "note is trimmed")
+
+        // A blank note clears it back to null rather than storing empty text.
+        repository.updateNote(added.id, "   ")
+        assertNull(repository.getAll().single().note)
+    }
+
+    @Test
     fun testAddManualItem() = runTest {
         val result = repository.addManual("Napkins")
 

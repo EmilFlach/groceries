@@ -28,6 +28,16 @@ data class LokcalFrequentFood(
 )
 
 /**
+ * One ingredient of a Lokcal meal: the catalog [food] plus how many grams the recipe calls for
+ * ([quantityG], from `MealItem.quantity_g`). Drives the grams note auto-filled when a meal
+ * ingredient is added to the shopping list.
+ */
+data class LokcalMealItem(
+    val food: LokcalFood,
+    val quantityG: Double,
+)
+
+/**
  * Mirrors the subset of Lokcal's own `Meal` table read from the imported snapshot.
  * Source of truth: Lokcal/shared/sqldelight/com/emilflach/lokcal/Meals.sq
  */

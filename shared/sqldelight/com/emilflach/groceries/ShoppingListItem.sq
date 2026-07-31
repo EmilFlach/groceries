@@ -3,6 +3,9 @@ CREATE TABLE ShoppingListItem (
     lokcal_food_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     image_url TEXT,
+    -- Free-text note per item (grams/amounts or any reminder). Auto-filled with the required grams
+    -- for meal-ingredient adds; otherwise user-entered on the list screen. NULL = no note.
+    note TEXT,
     added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     checked_at TEXT
 );
@@ -27,10 +30,14 @@ selectMinFoodId:
 SELECT MIN(lokcal_food_id) FROM ShoppingListItem;
 
 insertItem:
-INSERT INTO ShoppingListItem(lokcal_food_id, name, image_url) VALUES (?, ?, ?);
+INSERT INTO ShoppingListItem(lokcal_food_id, name, image_url, note) VALUES (?, ?, ?, ?);
 
 selectLastInsertRowId:
 SELECT last_insert_rowid();
+
+-- Sets (or clears, with NULL) the free-text note on a single item.
+updateNote:
+UPDATE ShoppingListItem SET note = ? WHERE id = ?;
 
 setChecked:
 UPDATE ShoppingListItem SET checked_at = ? WHERE id = ?;

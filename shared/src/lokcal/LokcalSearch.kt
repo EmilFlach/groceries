@@ -42,8 +42,8 @@ internal interface LokcalSnapshotQueries {
      */
     suspend fun regularMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal>
 
-    /** The ingredient foods of a meal, in the meal's own item order. */
-    suspend fun mealItems(mealId: Long): List<LokcalFood>
+    /** The ingredients of a meal (food + required grams), in the meal's own item order. */
+    suspend fun mealItems(mealId: Long): List<LokcalMealItem>
 }
 
 /** SQL shared by the Android (`SQLiteDatabase`) and JVM (JDBC) actuals — both plain SQLite. */
@@ -101,9 +101,10 @@ internal object LokcalSearchSql {
             "HAVING weeks >= CAST(? AS INTEGER) " +
             "ORDER BY weeks DESC, last_eaten DESC LIMIT ?"
 
-    // A meal's ingredient foods, in the meal's own item order. Params: mealId.
+    // A meal's ingredients (food columns + required grams), in the meal's own item order. The
+    // trailing quantity_g is the last column (index 7 zero-based / 8 one-based). Params: mealId.
     const val MEAL_ITEMS =
-        "SELECT $COLS_F FROM MealItem mi JOIN Food f ON f.id = mi.food_id " +
+        "SELECT $COLS_F, mi.quantity_g FROM MealItem mi JOIN Food f ON f.id = mi.food_id " +
             "WHERE mi.meal_id = ? ORDER BY mi.id"
 
     // Params, in order: like, like, qLower, qLower, limit.

@@ -1,7 +1,10 @@
 package com.emilflach.groceries.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,9 +15,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,18 +33,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.emilflach.groceries.ShoppingListItem
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ShoppingListItemRow(
     item: ShoppingListItem,
     onCheckedChange: (Boolean) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
-    currentAisleName: String? = null,
     onAssignLabel: (() -> Unit)? = null,
+    onEditNote: (() -> Unit)? = null,
 ) {
     val checked = item.checked_at != null
     Surface(
-        onClick = { onCheckedChange(!checked) },
         shape = MaterialTheme.shapes.medium,
         color = if (checked) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
         tonalElevation = if (checked) 0.dp else 1.dp,
@@ -49,7 +52,15 @@ fun ShoppingListItemRow(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            // Tap toggles bought/not; the rarely-used aisle assignment sits behind a long-press so it
+            // needn't take up a permanent button next to the frequent note and delete actions.
+            modifier = Modifier
+                .combinedClickable(
+                    onClick = { onCheckedChange(!checked) },
+                    onLongClick = onAssignLabel,
+                    onLongClickLabel = "Assign shop aisle",
+                )
+                .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             Box(contentAlignment = Alignment.BottomEnd) {
                 FoodImage(
@@ -80,24 +91,35 @@ fun ShoppingListItemRow(
 
             Spacer(Modifier.width(12.dp))
 
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None,
-                color = if (checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None,
+                    color = if (checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                )
+                // The grams/amount or any free-text note, shown just under the name when present.
+                item.note?.let { note ->
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
-            if (onAssignLabel != null) {
-                val labeled = currentAisleName != null
-                IconButton(onClick = onAssignLabel, modifier = Modifier.size(36.dp)) {
+            if (onEditNote != null) {
+                val hasNote = item.note != null
+                IconButton(onClick = onEditNote, modifier = Modifier.size(36.dp)) {
                     Icon(
-                        if (labeled) Icons.Filled.LocalOffer else Icons.Outlined.LocalOffer,
-                        contentDescription = if (labeled) "Aisle: $currentAisleName" else "Assign aisle to ${item.name}",
-                        tint = if (labeled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        if (hasNote) Icons.Filled.EditNote else Icons.Outlined.EditNote,
+                        contentDescription = if (hasNote) "Edit note on ${item.name}" else "Add note to ${item.name}",
+                        tint = if (hasNote) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp),
                     )
                 }

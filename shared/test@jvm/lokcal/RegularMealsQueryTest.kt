@@ -61,10 +61,10 @@ class RegularMealsQueryTest {
     }
 
     @Suppress("SameParameterValue") // general helper; the current tests happen to only use meal 1
-    private fun mealItem(mealId: Long, foodId: Long) {
+    private fun mealItem(mealId: Long, foodId: Long, grams: Double = 0.0) {
         //noinspection SqlResolve
-        connection.prepareStatement("INSERT INTO MealItem(meal_id, food_id) VALUES (?, ?)").use {
-            it.setLong(1, mealId); it.setLong(2, foodId); it.executeUpdate()
+        connection.prepareStatement("INSERT INTO MealItem(meal_id, food_id, quantity_g) VALUES (?, ?, ?)").use {
+            it.setLong(1, mealId); it.setLong(2, foodId); it.setDouble(3, grams); it.executeUpdate()
         }
     }
 
@@ -165,10 +165,12 @@ class RegularMealsQueryTest {
         meal(1, "Pasta")
         food(10, "Spaghetti"); food(11, "Tomato"); food(12, "Beef")
         // Inserted out of food-id order; MEAL_ITEMS orders by MealItem.id, i.e. insertion order.
-        mealItem(1, 12); mealItem(1, 10); mealItem(1, 11)
+        mealItem(1, 12, grams = 300.0); mealItem(1, 10, grams = 200.0); mealItem(1, 11, grams = 150.0)
 
-        val names = queries.mealItems(1).map { it.name }
+        val items = queries.mealItems(1)
 
-        assertEquals(listOf("Beef", "Spaghetti", "Tomato"), names)
+        assertEquals(listOf("Beef", "Spaghetti", "Tomato"), items.map { it.food.name })
+        // Each ingredient carries its required grams (MealItem.quantity_g).
+        assertEquals(listOf(300.0, 200.0, 150.0), items.map { it.quantityG })
     }
 }

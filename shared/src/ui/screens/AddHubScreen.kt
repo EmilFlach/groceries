@@ -36,11 +36,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.emilflach.groceries.Aisle
 import com.emilflach.groceries.data.normalizeKey
 import com.emilflach.groceries.lokcal.LokcalCatalogReader
 import com.emilflach.groceries.lokcal.LokcalFood
 import com.emilflach.groceries.recommendations.RegularMealSource
 import com.emilflach.groceries.recommendations.Suggestion
+import com.emilflach.groceries.ui.components.AislePickerSheet
 import com.emilflach.groceries.ui.components.FoodImage
 import com.emilflach.groceries.ui.util.PlatformBackHandler
 import com.emilflach.groceries.viewmodel.SuggestionGroupUi
@@ -63,12 +65,16 @@ fun AddHubScreen(
     regularKeys: Set<String>,
     addedKeys: Set<String>,
     aisleNames: Map<String, String>,
+    aisles: List<Aisle>,
+    aisleIdByKey: Map<String, Long>,
     onDismiss: () -> Unit,
     onFoodSelected: (LokcalFood) -> Unit,
     onAddCustom: (String) -> Unit,
     onToggleSuggestion: (Suggestion) -> Unit,
     onAddAll: (SuggestionGroupUi) -> Unit,
     onToggleRegular: (Suggestion) -> Unit,
+    onAssignAisle: (Suggestion, Long) -> Unit,
+    onClearAisle: (Suggestion) -> Unit,
     onDismissMeal: (SuggestionGroupUi) -> Unit,
     onRestoreMeal: (SuggestionGroupUi) -> Unit,
     onDismissSuggestion: (Suggestion) -> Unit,
@@ -120,6 +126,9 @@ fun AddHubScreen(
         onDismissSuggestion(suggestion)
         dismissWithUndo(suggestion.name) { onRestoreSuggestion(suggestion) }
     }
+
+    // The suggestion whose aisle is being picked (via a card's long-press menu); null = sheet closed.
+    var aisleTarget by remember { mutableStateOf<Suggestion?>(null) }
 
     PlatformBackHandler { onDismiss() }
 
@@ -219,6 +228,7 @@ fun AddHubScreen(
                     // Back/dismiss is how you return to the list.
                     onFoodSelected = { food -> onFoodSelected(food) },
                     onToggleRegular = { onToggleRegular(it.toSuggestion()) },
+                    onAssignAisle = { aisleTarget = it.toSuggestion() },
                 )
             } else {
                 Suggestions(
@@ -229,6 +239,7 @@ fun AddHubScreen(
                     onToggle = onToggleSuggestion,
                     onAddAll = onAddAll,
                     onToggleRegular = onToggleRegular,
+                    onAssignAisle = { aisleTarget = it },
                     onDismissMeal = onMealDismissed,
                     onDismissSuggestion = onSuggestionDismissed,
                 )
@@ -243,6 +254,23 @@ fun AddHubScreen(
         )
       }
     }
+
+    aisleTarget?.let { target ->
+        AislePickerSheet(
+            itemName = target.name,
+            aisles = aisles,
+            selectedAisleId = aisleIdByKey[target.key],
+            onSelect = { aisleId ->
+                onAssignAisle(target, aisleId)
+                aisleTarget = null
+            },
+            onClear = {
+                onClearAisle(target)
+                aisleTarget = null
+            },
+            onDismiss = { aisleTarget = null },
+        )
+    }
 }
 
 /** Long-press context menu anchored to a card: a single toggle for regular status. Appearing
@@ -254,6 +282,7 @@ private fun RegularContextMenu(
     isRegular: Boolean,
     onDismiss: () -> Unit,
     onToggle: () -> Unit,
+    onAssignAisle: (() -> Unit)? = null,
     onNotInterested: (() -> Unit)? = null,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
@@ -268,6 +297,20 @@ private fun RegularContextMenu(
             },
             onClick = onToggle,
         )
+        // Categorising a food when adding it — the aisle assignment moved off the list row into here.
+        if (onAssignAisle != null) {
+            DropdownMenuItem(
+                text = { Text("Assign aisle") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.LocalOffer,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                onClick = onAssignAisle,
+            )
+        }
         // Only offered where dismissing makes sense (auto suggestions, not the user's own regulars).
         if (onNotInterested != null) {
             DropdownMenuItem(
@@ -294,6 +337,7 @@ private fun ColumnScope.Suggestions(
     onToggle: (Suggestion) -> Unit,
     onAddAll: (SuggestionGroupUi) -> Unit,
     onToggleRegular: (Suggestion) -> Unit,
+    onAssignAisle: (Suggestion) -> Unit,
     onDismissMeal: (SuggestionGroupUi) -> Unit,
     onDismissSuggestion: (Suggestion) -> Unit,
 ) {
@@ -358,6 +402,7 @@ private fun ColumnScope.Suggestions(
                                 aisleName = aisleNames[cell.suggestion.key],
                                 onClick = { onToggle(cell.suggestion) },
                                 onToggleRegular = { onToggleRegular(cell.suggestion) },
+                                onAssignAisle = { onAssignAisle(cell.suggestion) },
                                 // Dismissing a manual regular makes no sense — unmark it instead.
                                 onNotInterested = if (cellIsRegular) null else {
                                     { onDismissSuggestion(cell.suggestion) }
@@ -527,6 +572,7 @@ private fun SuggestionCard(
     aisleName: String?,
     onClick: () -> Unit,
     onToggleRegular: () -> Unit,
+    onAssignAisle: () -> Unit,
     onNotInterested: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -585,6 +631,10 @@ private fun SuggestionCard(
             onToggle = {
                 menuExpanded = false
                 onToggleRegular()
+            },
+            onAssignAisle = {
+                menuExpanded = false
+                onAssignAisle()
             },
             onNotInterested = onNotInterested?.let {
                 {
@@ -672,6 +722,7 @@ private fun ColumnScope.SearchResults(
     onAddCustom: () -> Unit,
     onFoodSelected: (LokcalFood) -> Unit,
     onToggleRegular: (LokcalFood) -> Unit,
+    onAssignAisle: (LokcalFood) -> Unit,
 ) {
     // Anything the catalog doesn't have can still go on the list as a free-typed item.
     AddCustomRow(name = query, onClick = onAddCustom)
@@ -714,6 +765,7 @@ private fun ColumnScope.SearchResults(
                         added = normalizeKey(food.name) in addedKeys,
                         onClick = { onFoodSelected(food) },
                         onToggleRegular = { onToggleRegular(food) },
+                        onAssignAisle = { onAssignAisle(food) },
                     )
                 }
             }
@@ -765,6 +817,7 @@ private fun FoodPickCard(
     added: Boolean,
     onClick: () -> Unit,
     onToggleRegular: () -> Unit,
+    onAssignAisle: () -> Unit,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -810,6 +863,10 @@ private fun FoodPickCard(
             onToggle = {
                 menuExpanded = false
                 onToggleRegular()
+            },
+            onAssignAisle = {
+                menuExpanded = false
+                onAssignAisle()
             },
         )
     }

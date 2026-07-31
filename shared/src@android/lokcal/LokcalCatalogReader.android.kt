@@ -35,7 +35,7 @@ actual class LokcalCatalogReader(private val context: Context) {
     actual suspend fun frequentMeals(windowDays: Int, minWeeks: Int, limit: Int): List<LokcalFrequentMeal> =
         read(emptyList()) { it.regularMeals(windowDays, minWeeks, limit) }
 
-    actual suspend fun mealItems(mealId: Long): List<LokcalFood> =
+    actual suspend fun mealItems(mealId: Long): List<LokcalMealItem> =
         read(emptyList()) { it.mealItems(mealId) }
 
     /** Runs [block] against the cached read-only snapshot — off the main thread and one at a time. */
@@ -97,8 +97,13 @@ private class AndroidLokcalQueries(private val db: SQLiteDatabase) : LokcalSnaps
             arrayOf(windowDays.toString(), minWeeks.toString(), limit.toString()),
         ).use { it.readFrequentMeals() }
 
-    override suspend fun mealItems(mealId: Long): List<LokcalFood> =
-        db.rawQuery(LokcalSearchSql.MEAL_ITEMS, arrayOf(mealId.toString())).use { it.readFoods() }
+    override suspend fun mealItems(mealId: Long): List<LokcalMealItem> =
+        db.rawQuery(LokcalSearchSql.MEAL_ITEMS, arrayOf(mealId.toString())).use { cursor ->
+            val out = ArrayList<LokcalMealItem>(cursor.count)
+            // Columns 0..6 are the food (COLS_F); 7 = quantity_g (the trailing MEAL_ITEMS column).
+            while (cursor.moveToNext()) out += LokcalMealItem(cursor.readFood(), cursor.getDouble(7))
+            out
+        }
 
     private fun query(sql: String, args: Array<String>?): List<LokcalFood> =
         db.rawQuery(sql, args).use { it.readFoods() }

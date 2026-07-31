@@ -19,6 +19,7 @@ class GroupByAisleTest {
             lokcal_food_id = foodId,
             name = name,
             image_url = null,
+            note = null,
             added_at = "2026-07-28T00:00:0$id",
             checked_at = null,
         )

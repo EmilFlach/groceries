@@ -6,12 +6,15 @@ package com.emilflach.groceries.recommendations
  *
  * @param lokcalFoodId the Lokcal catalog id when this came from a catalog food; null for
  *   free-typed regulars (which get a synthetic id when added, like other manual items).
+ * @param note text pre-filled onto the shopping-list item when added — the required grams for a
+ *   meal ingredient; null when there's nothing to prefill (regulars, plain search results).
  */
 data class Suggestion(
     val key: String,
     val name: String,
     val imageUrl: String?,
     val lokcalFoodId: Long?,
+    val note: String? = null,
 )
 
 /**

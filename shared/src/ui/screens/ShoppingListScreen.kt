@@ -37,8 +37,10 @@ import com.emilflach.groceries.ShoppingListItem
 import com.emilflach.groceries.data.normalizeKey
 import com.emilflach.groceries.ui.components.AislePickerSheet
 import com.emilflach.groceries.ui.components.FoodImage
+import com.emilflach.groceries.ui.components.NoteEditDialog
 import com.emilflach.groceries.ui.components.ShoppingListItemRow
 import com.emilflach.groceries.viewmodel.ShoppingListViewModel
+import com.emilflach.groceries.viewmodel.groupByAisle
 
 @Composable
 fun ShoppingListScreen(
@@ -49,20 +51,25 @@ fun ShoppingListScreen(
     onAddItem: () -> Unit,
 ) {
     val items by viewModel.items.collectAsState()
-    val toBuyGroups by viewModel.toBuyGroups.collectAsState()
     val aisles by viewModel.aisles.collectAsState()
     val labels by viewModel.labels.collectAsState()
     val toBuyItems = items.filter { it.checked_at == null }
     val checkedItems = items.filter { it.checked_at != null }
 
-    val aisleNameById = remember(aisles) { aisles.associate { it.id to it.name } }
+    // Group "to buy" locally from this same `items` snapshot rather than a separate flow: the
+    // ViewModel's toBuyGroups is a combine(...).stateIn(...) that recomputes asynchronously, so on
+    // the frame right after checking an item it can still list that item as "to buy" while `items`
+    // already has it checked — the same id then appears in both sections and the LazyColumn crashes
+    // on the duplicate key. Deriving both sections from one snapshot keeps them consistent.
+    val toBuyGroups = remember(toBuyItems, labels, aisles) { groupByAisle(toBuyItems, labels, aisles) }
+
     fun aisleIdFor(item: ShoppingListItem): Long? = labels[normalizeKey(item.name)]
-    fun aisleNameFor(item: ShoppingListItem): String? = aisleIdFor(item)?.let { aisleNameById[it] }
 
     // Once anything is labeled, break "to buy" into aisle sections; before that it's a plain list.
     val showAisleHeaders = toBuyGroups.any { it.aisleId != null }
 
     var labelingItem by remember { mutableStateOf<ShoppingListItem?>(null) }
+    var notingItem by remember { mutableStateOf<ShoppingListItem?>(null) }
     var showClearCartConfirm by remember { mutableStateOf(false) }
 
     // Prefer the catalog feed; fall back to the list items' own photos when there's no snapshot.
@@ -174,8 +181,8 @@ fun ShoppingListScreen(
                                     item = item,
                                     onCheckedChange = { checked -> onToggleChecked(item, checked) },
                                     onRemove = { viewModel.remove(item.id) },
-                                    currentAisleName = aisleNameFor(item),
                                     onAssignLabel = { labelingItem = item },
+                                    onEditNote = { notingItem = item },
                                     modifier = Modifier.animateItem().padding(horizontal = 16.dp),
                                 )
                             }
@@ -200,8 +207,8 @@ fun ShoppingListScreen(
                                 item = item,
                                 onCheckedChange = { checked -> onToggleChecked(item, checked) },
                                 onRemove = { viewModel.remove(item.id) },
-                                currentAisleName = aisleNameFor(item),
                                 onAssignLabel = { labelingItem = item },
+                                onEditNote = { notingItem = item },
                                 modifier = Modifier.animateItem().padding(horizontal = 16.dp),
                             )
                         }
@@ -225,6 +232,18 @@ fun ShoppingListScreen(
                 labelingItem = null
             },
             onDismiss = { labelingItem = null },
+        )
+    }
+
+    notingItem?.let { item ->
+        NoteEditDialog(
+            itemName = item.name,
+            initialNote = item.note,
+            onSave = { note ->
+                viewModel.setNote(item.id, note)
+                notingItem = null
+            },
+            onDismiss = { notingItem = null },
         )
     }
 

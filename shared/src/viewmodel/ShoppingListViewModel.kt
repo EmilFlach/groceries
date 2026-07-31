@@ -9,11 +9,8 @@ import com.emilflach.groceries.data.normalizeKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** A run of "to buy" items sharing an aisle. Groups are ordered by the aisle's [sortOrder]; the
@@ -44,12 +41,6 @@ class ShoppingListViewModel(
     private val _aisles = MutableStateFlow<List<Aisle>>(emptyList())
     val aisles: StateFlow<List<Aisle>> = _aisles.asStateFlow()
 
-    /** The unchecked ("to buy") items grouped and ordered by supermarket aisle, unlabeled last. */
-    val toBuyGroups: StateFlow<List<AisleGroup>> =
-        combine(_items, _labels, _aisles) { items, labels, aisles ->
-            groupByAisle(items.filter { it.checked_at == null }, labels, aisles)
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
     init {
         refresh()
     }
@@ -62,19 +53,33 @@ class ShoppingListViewModel(
         }
     }
 
-    fun addItem(lokcalFoodId: Long, name: String, imageUrl: String?, onResult: (AddItemResult) -> Unit = {}) {
+    fun addItem(
+        lokcalFoodId: Long,
+        name: String,
+        imageUrl: String?,
+        note: String? = null,
+        onResult: (AddItemResult) -> Unit = {},
+    ) {
         viewModelScope.launch {
-            val result = repository.add(lokcalFoodId, name, imageUrl)
+            val result = repository.add(lokcalFoodId, name, imageUrl, note)
             refresh()
             onResult(result)
         }
     }
 
-    fun addManualItem(name: String, onResult: (AddItemResult) -> Unit = {}) {
+    fun addManualItem(name: String, note: String? = null, onResult: (AddItemResult) -> Unit = {}) {
         viewModelScope.launch {
-            val result = repository.addManual(name)
+            val result = repository.addManual(name, note)
             refresh()
             onResult(result)
+        }
+    }
+
+    /** Sets (or clears, when blank) the free-text note on an item. */
+    fun setNote(id: Long, note: String?) {
+        viewModelScope.launch {
+            repository.updateNote(id, note)
+            refresh()
         }
     }
 
@@ -115,16 +120,22 @@ class ShoppingListViewModel(
     }
 
     /** Assigns [item] (and every other item sharing its normalized name) to the given aisle. */
-    fun setLabel(item: ShoppingListItem, aisleId: Long) {
+    fun setLabel(item: ShoppingListItem, aisleId: Long) = setLabel(item.name, aisleId)
+
+    fun clearLabel(item: ShoppingListItem) = clearLabel(item.name)
+
+    /** Aisle assignment keyed by food name — used from the Add hub, where there's no list row yet.
+     *  The label is stored per normalized name, so it applies wherever that food appears. */
+    fun setLabel(name: String, aisleId: Long) {
         viewModelScope.launch {
-            labelRepository.setLabel(item.name, aisleId)
+            labelRepository.setLabel(name, aisleId)
             refresh()
         }
     }
 
-    fun clearLabel(item: ShoppingListItem) {
+    fun clearLabel(name: String) {
         viewModelScope.launch {
-            labelRepository.clearLabel(item.name)
+            labelRepository.clearLabel(name)
             refresh()
         }
     }

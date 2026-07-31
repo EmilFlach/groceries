@@ -28,8 +28,9 @@ class RegularItemRepositoryTest {
     @Test
     fun schemaIsAtLatestVersion() {
         // Bumps as migrations are added: v1 base, +1.sqm (aisles), +2.sqm (RegularItem),
-        // +3.sqm (DismissedSuggestion) = 4. Guards that new .sq tables are wired with a migration.
-        assertEquals(4L, Database.Schema.version)
+        // +3.sqm (DismissedSuggestion), +4.sqm (ShoppingListItem.note) = 5. Guards that new .sq
+        // columns/tables are wired with a migration.
+        assertEquals(5L, Database.Schema.version)
     }
 
     @Test
