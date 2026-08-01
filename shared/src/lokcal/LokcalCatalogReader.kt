@@ -29,4 +29,10 @@ expect class LokcalCatalogReader {
 
     /** The ingredients of a meal (food + required grams; see [frequentMeals]), in item order. */
     suspend fun mealItems(mealId: Long): List<LokcalMealItem>
+
+    /**
+     * Meals whose name matches [query] (case-insensitive substring), name-ordered. Powers the meal
+     * results in the Add hub's search. Empty on platforms without a Lokcal snapshot (iOS/wasm).
+     */
+    suspend fun searchMeals(query: String): List<LokcalMeal>
 }

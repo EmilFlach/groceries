@@ -44,6 +44,9 @@ internal interface LokcalSnapshotQueries {
 
     /** The ingredients of a meal (food + required grams), in the meal's own item order. */
     suspend fun mealItems(mealId: Long): List<LokcalMealItem>
+
+    /** Meals whose name matches [like] (a pre-lowercased `%…%` pattern), name-ordered, capped at [limit]. */
+    suspend fun searchMeals(like: String, limit: Int): List<LokcalMeal>
 }
 
 /** SQL shared by the Android (`SQLiteDatabase`) and JVM (JDBC) actuals — both plain SQLite. */
@@ -107,6 +110,11 @@ internal object LokcalSearchSql {
         "SELECT $COLS_F, mi.quantity_g FROM MealItem mi JOIN Food f ON f.id = mi.food_id " +
             "WHERE mi.meal_id = ? ORDER BY mi.id"
 
+    // Meals whose name matches the caller's LIKE pattern (already lowercased), name-ordered.
+    // Params, in order: like, limit. Columns 0..2 = id, name, image_url.
+    const val SEARCH_MEALS =
+        "SELECT m.id, m.name, m.image_url FROM Meal m WHERE LOWER(m.name) LIKE ? ORDER BY m.name LIMIT ?"
+
     // Params, in order: like, like, qLower, qLower, limit.
     const val SEARCH_RANKED =
         "SELECT $COLS_F FROM Food f $TRACK_JOIN " +
@@ -160,6 +168,17 @@ internal suspend fun searchCatalog(query: String, queries: LokcalSnapshotQueries
 
     // 4. Levenshtein fallback: edit distance ≤ 2 on normalized names, for typos.
     return all.filter { levenshtein(normalize(it.name.lowercase()), qNorm) <= 2 }.take(SEARCH_LIMIT)
+}
+
+/**
+ * Substring search over meal names (case-insensitive), name-ordered. Simpler than [searchCatalog]:
+ * meals are few and have no barcodes/aliases, so a plain `LIKE` on the lowercased name is enough.
+ * Empty for a blank query.
+ */
+internal suspend fun searchMeals(query: String, queries: LokcalSnapshotQueries): List<LokcalMeal> {
+    val trimmed = query.trim()
+    if (trimmed.isEmpty()) return emptyList()
+    return queries.searchMeals("%${trimmed.lowercase()}%", SEARCH_LIMIT)
 }
 
 private val charNormMap: Map<Char, String> = mapOf(

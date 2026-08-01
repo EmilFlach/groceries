@@ -158,4 +158,22 @@ class LokcalSearchTest {
         food(3, "Banana"); logged(3, 10)
         assertEquals(listOf("Banana", "Zucchini", "Apple"), queries.browse(10).map { it.name })
     }
+
+    @Test
+    fun searchMealsMatchesNameSubstringCaseInsensitiveAndNameOrdered() = runTest {
+        meal("Chicken Curry", "https://img/curry.jpg")
+        meal("Beef Stew", null)
+        meal("Chickpea Salad", null)
+        val hits = searchMeals("CHICK", queries)
+        assertEquals(listOf("Chicken Curry", "Chickpea Salad"), hits.map { it.name })
+        // Image url rides along for the ones that have it.
+        assertEquals("https://img/curry.jpg", hits.first().imageUrl)
+    }
+
+    @Test
+    fun searchMealsBlankOrNoMatchIsEmpty() = runTest {
+        meal("Chicken Curry", null)
+        assertTrue(searchMeals("   ", queries).isEmpty())
+        assertTrue(searchMeals("sushi", queries).isEmpty())
+    }
 }

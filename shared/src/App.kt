@@ -23,6 +23,7 @@ import com.emilflach.groceries.lokcal.LokcalCatalogReader
 import com.emilflach.groceries.lokcal.LokcalImportRepository
 import com.emilflach.groceries.lokcal.LokcalFrequentMeal
 import com.emilflach.groceries.lokcal.LokcalMealItem
+import com.emilflach.groceries.mealie.MealieClient
 import com.emilflach.groceries.recommendations.FrequentMealProvider
 import com.emilflach.groceries.recommendations.RecommendationRepository
 import com.emilflach.groceries.recommendations.RegularMealSource
@@ -50,6 +51,10 @@ fun App(
 ) {
     AppTheme {
         ConfigureCoilImageLoader()
+
+        // Mealie recipe client — no DB/platform deps beyond its (nullable) HTTP engine, so it's built
+        // once here. On web (no engine) it degrades to empty results.
+        val mealieClient = remember { MealieClient() }
 
         val database by produceState<Database?>(null) {
             value = createDatabase(sqlDriverFactory)
@@ -157,6 +162,7 @@ fun App(
             val aisleIdByKey by shoppingListViewModel.labels.collectAsState()
             AddHubScreen(
                 catalogReader = lokcalCatalogReader,
+                mealieClient = mealieClient,
                 groups = groups,
                 regularKeys = regularKeys,
                 addedKeys = addedKeys,
@@ -179,6 +185,24 @@ fun App(
                 },
                 onAddCustom = { name ->
                     shoppingListViewModel.addManualItem(name)
+                },
+                onAddIngredient = { ingredient ->
+                    if (ingredient.lokcalFoodId != null) {
+                        // Catalog-backed ingredient: route through the shared toggle so it dedups
+                        // against the list and carries the grams note, like a suggestion tap.
+                        suggestionsViewModel.toggle(
+                            Suggestion(
+                                key = normalizeKey(ingredient.name),
+                                name = ingredient.name,
+                                imageUrl = ingredient.imageUrl,
+                                lokcalFoodId = ingredient.lokcalFoodId,
+                                note = ingredient.note,
+                            )
+                        )
+                    } else {
+                        // Free-text (Mealie) ingredient: a plain custom item.
+                        shoppingListViewModel.addManualItem(ingredient.name, ingredient.note)
+                    }
                 },
                 onToggleSuggestion = { suggestionsViewModel.toggle(it) },
                 onAddAll = { suggestionsViewModel.addAll(it) },
